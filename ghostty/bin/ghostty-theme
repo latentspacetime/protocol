@@ -1,0 +1,129 @@
+#!/bin/zsh
+
+set -eu
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:${PATH:-}"
+
+config="${GHOSTTY_CONFIG_FILE:-$HOME/.config/ghostty/config}"
+user_themes="${GHOSTTY_THEME_DIR:-$HOME/.config/ghostty/themes}"
+resource_themes="/Applications/Ghostty.app/Contents/Resources/ghostty/themes"
+
+die() {
+  print -u2 -r -- "ghostty-theme: $1"
+  exit 1
+}
+
+theme_file() {
+  local name="$1"
+  [[ -f "$user_themes/$name" ]] && { print -r -- "$user_themes/$name"; return; }
+  [[ -f "$resource_themes/$name" ]] && { print -r -- "$resource_themes/$name"; return; }
+  return 1
+}
+
+apply_theme() {
+  local file
+  file=$(theme_file "$1") || die "unknown theme: $1"
+  local terminal=/dev/null
+  tty -s 2>/dev/null && terminal=/dev/tty
+
+  local line key value
+  while IFS= read -r line; do
+    key="${line%%=*}"
+    key="${key// /}"
+    value="${line#*=}"
+    value="${value# }"
+    case "$key" in
+      palette) printf '\033]4;%s;%s\033\\' "${value%%=*}" "${value#*=}" > "$terminal" ;;
+      background) printf '\033]11;%s\033\\' "$value" > "$terminal" ;;
+      foreground) printf '\033]10;%s\033\\' "$value" > "$terminal" ;;
+      cursor-color) printf '\033]12;%s\033\\' "$value" > "$terminal" ;;
+    esac
+  done < "$file"
+
+  local index
+  for index in {0..15}; do
+    printf '\033[48;5;%dm   \033[0m' "$index"
+    [[ "$index" -eq 7 ]] && print
+  done
+  print
+  print -r -- "$1"
+}
+
+list_themes() {
+  {
+    command ls "$user_themes" 2>/dev/null || true
+    ghostty +list-themes --plain 2>/dev/null | sed 's/ (resources)$//' || true
+  } | sort -u
+}
+
+current_theme() {
+  sed -n 's/^theme = //p' "$config" | tail -1
+}
+
+reload_ghostty() {
+  local process_ids
+  process_ids=$(ps ax -o pid=,comm= | awk '/Ghostty\.app\/Contents\/MacOS\/ghostty$/ { print $1 }')
+  [[ -n "$process_ids" ]] || return 1
+  kill -USR2 ${=process_ids} 2>/dev/null
+}
+
+persist_theme() {
+  local name="$1"
+  if grep -q '^theme = ' "$config"; then
+    local temporary="${config}.tmp.$$"
+    awk -v selected="$name" '
+      BEGIN { replaced = 0 }
+      /^theme = / && !replaced { print "theme = " selected; replaced = 1; next }
+      { print }
+    ' "$config" > "$temporary"
+    mv "$temporary" "$config"
+  else
+    print -r -- "theme = $name" >> "$config"
+  fi
+}
+
+pick_theme() {
+  local mode="$1"
+  [[ -f "$config" ]] || die "missing config: $config"
+  command -v fzf >/dev/null || die "fzf is required"
+
+  local header
+  if [[ "$mode" == default ]]; then
+    header="Enter: set default | Esc: keep $(current_theme)"
+  else
+    header="Enter: apply to this terminal | Esc: restore default"
+  fi
+
+  local choice
+  choice=$(list_themes | fzf \
+    --prompt="Ghostty theme ($mode)> " \
+    --preview="${(q)0} apply {}" \
+    --preview-window=down,4 \
+    --header="$header") || true
+
+  if [[ -n "$choice" ]]; then
+    apply_theme "$choice" >/dev/null
+    if [[ "$mode" == default ]]; then
+      persist_theme "$choice"
+      reload_ghostty || true
+      print -r -- "Default theme: $choice"
+    else
+      print -r -- "This terminal: $choice"
+    fi
+    return
+  fi
+
+  local configured
+  configured=$(current_theme)
+  [[ -n "$configured" ]] && apply_theme "$configured" >/dev/null
+  print -r -- "Kept default: ${configured:-(not configured)}"
+}
+
+case "${1:-}" in
+  "") pick_theme default ;;
+  here) pick_theme here ;;
+  apply)
+    (( $# == 2 )) || die "usage: ghostty-theme apply <name>"
+    apply_theme "$2"
+    ;;
+  *) die "usage: ghostty-theme [here | apply <name>]" ;;
+esac

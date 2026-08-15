@@ -1,0 +1,6 @@
+# Colors are owned by the selected theme. Keeping color values out of this
+# file allows the theme picker to switch the complete palette atomically.
+theme = midnight-cyan
+
+cursor-style = block
+cursor-style-blink = true
