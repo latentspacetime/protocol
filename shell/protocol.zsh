@@ -184,5 +184,11 @@ alias sz='source ~/.zshrc'
 alias theme="$PROTOCOL_ROOT/ghostty/bin/ghostty-theme"
 alias doctor="$PROTOCOL_ROOT/scripts/doctor.zsh"
 
-[[ -f "$HOME/.fzf.zsh" ]] && source "$HOME/.fzf.zsh"
-command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
+# if-guards, not &&-lists: a missing optional tool must not become a nonzero
+# exit status for this file, or sourcing it under errexit aborts the shell.
+if [[ -f "$HOME/.fzf.zsh" ]]; then
+  source "$HOME/.fzf.zsh"
+fi
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init zsh)"
+fi

@@ -34,6 +34,12 @@ for script in "$root/install.zsh" "$root/scripts/check.zsh" "$root/scripts/docto
 done
 
 /bin/zsh -n "$root/shell/protocol.zsh"
+
+# The shell module must also *source* cleanly, with status 0, in a bare shell
+# running under errexit -- syntax checking alone missed a trailing &&-list
+# that returned nonzero whenever an optional tool was absent.
+PROTOCOL_CHECK_MODULE="$root/shell/protocol.zsh" \
+  /bin/zsh -fec 'source "$PROTOCOL_CHECK_MODULE"'
 python3 -m py_compile "$root/agent/hooks/semantic-title.py"
 
 if grep -RIE '/Users/|Co-Authored-By:|T-[A-Z][0-9-]+' \
