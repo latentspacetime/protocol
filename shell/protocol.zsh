@@ -2,6 +2,7 @@
 
 typeset -g PROTOCOL_ROOT="${${(%):-%N}:A:h:h}"
 export CODE_WORKSPACE="${CODE_WORKSPACE:-$HOME/Code}"
+export PROTOCOL_FRICTION_LOG="${PROTOCOL_FRICTION_LOG:-${XDG_STATE_HOME:-$HOME/.local/state}/protocol/friction-log.md}"
 
 typeset -gA PROTOCOL_REPO_COLORS
 typeset -ga PROTOCOL_REPO_PALETTE=(131 71 67 133 173 179 98 109 144 174 103 72 137 110 180 139)
@@ -139,10 +140,55 @@ cbfix() {
   print "Clipboard unwrapped."
 }
 
+# ugh [message] -- capture a workflow annoyance the moment it happens, so
+# tooling improvements start from a frequency-ranked record instead of recall.
+# With a message: append one timestamped entry with directory and git branch.
+# Without: show the log location, entry count, and most recent entries.
+ugh() {
+  local log="$PROTOCOL_FRICTION_LOG"
+
+  if (( $# == 0 )); then
+    if [[ ! -f "$log" ]]; then
+      print "friction log is empty ($log)"
+      return
+    fi
+    print "$(grep -c '^- ' "$log") entries in $log, most recent:"
+    grep '^- ' "$log" | tail -5
+    return
+  fi
+
+  if [[ ! -f "$log" ]]; then
+    mkdir -p "${log:h}"
+    {
+      print -r -- "# Friction Log"
+      print
+      print -r -- "Workflow annoyances captured with the ugh command, one line each,"
+      print -r -- "recorded the moment they happened. Review before tooling work."
+      print
+    } > "$log"
+  fi
+
+  local where="${PWD/#$HOME/~}"
+  local branch
+  # Outside a repository git exits nonzero; that must not abort ugh when the
+  # calling shell runs under errexit.
+  branch=$(git branch --show-current 2>/dev/null) || true
+  [[ -n "$branch" ]] && where="$where ($branch)"
+  print -r -- "- $(date '+%Y-%m-%d %H:%M') $where: $*" >> "$log"
+  print "logged ($(grep -c '^- ' "$log") total)"
+}
+
 alias gpo='git pull origin'
 alias oe='opencode --auto'
 alias sz='source ~/.zshrc'
 alias theme="$PROTOCOL_ROOT/ghostty/bin/ghostty-theme"
+alias doctor="$PROTOCOL_ROOT/scripts/doctor.zsh"
 
-[[ -f "$HOME/.fzf.zsh" ]] && source "$HOME/.fzf.zsh"
-command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
+# if-guards, not &&-lists: a missing optional tool must not become a nonzero
+# exit status for this file, or sourcing it under errexit aborts the shell.
+if [[ -f "$HOME/.fzf.zsh" ]]; then
+  source "$HOME/.fzf.zsh"
+fi
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init zsh)"
+fi

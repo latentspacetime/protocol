@@ -1,19 +1,26 @@
--- These renderers are global because statusline and tabline expressions call
--- them through v:lua on every redraw.
+-- Statusline, tabline, and highlight groups.
+-- The renderer functions must stay on _G: the 'statusline' and 'tabline'
+-- option strings evaluate them through v:lua on every redraw.
+
+-- Walks up from start_path looking for .git/HEAD; returns the branch name,
+-- a short hash when detached, or "" outside a repo. Reads the file directly
+-- instead of shelling out so statusline redraws stay cheap.
 function _G.get_git_branch(start_path)
     local path = start_path or vim.fn.getcwd()
     if not path or path == "" then return "" end
-
     while path ~= "/" and path ~= "." do
         local git_head = path .. "/.git/HEAD"
-        local file = io.open(git_head, "r")
-        if file then
-            local content = file:read("*all")
-            file:close()
+        local f = io.open(git_head, "r")
+        if f then
+            local content = f:read("*all")
+            f:close()
             if content then
                 local branch = content:match("ref: refs/heads/(.+)")
-                if branch then return branch:gsub("%s+", "") end
-                return content:sub(1, 7)
+                if branch then
+                    return branch:gsub("%s+", "")
+                else
+                    return content:sub(1, 7)
+                end
             end
         end
         local parent = vim.fn.fnamemodify(path, ":h")
@@ -24,54 +31,65 @@ function _G.get_git_branch(start_path)
 end
 
 function _G.get_status_branch_string()
-    local branch = _G.get_git_branch(vim.fn.expand("%:p:h"))
-    return branch ~= "" and " [" .. branch .. "] " or " "
+    local dir = vim.fn.expand('%:p:h')
+    local branch = _G.get_git_branch(dir)
+    if branch ~= "" then return " [" .. branch .. "] " end
+    return " "
 end
 
 function _G.get_mode_info()
     if vim.bo.filetype == "NvimTree" then return "" end
     local mode = vim.fn.mode()
-    if mode == "t" or mode == "i" or mode == "ic" then
+    if mode == 't' or mode == 'i' or mode == 'ic' then
         return "%#ModeInsert# - INSERT - "
+    else
+        return "%#ModeNormal# - NORMAL - "
     end
-    return "%#ModeNormal# - NORMAL - "
 end
 
 vim.opt.statusline = "%f %m %{v:lua.get_status_branch_string()} %= %l:%c %{%v:lua.get_mode_info()%}"
 
-function _G.protocol_tabline()
-    local output = ""
-    for index = 1, vim.fn.tabpagenr("$") do
-        output = output .. (index == vim.fn.tabpagenr() and "%#TabLineSel#" or "%#TabLine#")
-        output = output .. " " .. index .. " "
-        if index == 1 then
-            output = output .. "WORKSPACE"
+-- Tab 1 is always the CORE workspace; other tabs show their file name.
+function _G.my_tabline()
+    local s = ""
+    for i = 1, vim.fn.tabpagenr('$') do
+        local is_selected = (i == vim.fn.tabpagenr())
+        if is_selected then s = s .. "%#TabLineSel#" else s = s .. "%#TabLine#" end
+        s = s .. " " .. i .. " "
+        if i == 1 then
+            s = s .. "CORE"
         else
-            local window = vim.fn.tabpagewinnr(index)
-            local buffer = vim.fn.tabpagebuflist(index)[window]
-            local filename = vim.fn.fnamemodify(vim.fn.bufname(buffer), ":t")
-            output = output .. (filename ~= "" and filename or "[No Name]")
+            local winnr = vim.fn.tabpagewinnr(i)
+            local buflist = vim.fn.tabpagebuflist(i)
+            local bufnr = buflist[winnr]
+            local bufname = vim.fn.bufname(bufnr)
+            local filename = vim.fn.fnamemodify(bufname, ":t")
+            if filename == "" then filename = "[No Name]" end
+            s = s .. filename
         end
-        output = output .. " "
+        s = s .. " "
     end
-    return output .. "%#TabLineFill#%T"
+    s = s .. "%#TabLineFill#%T"
+    return s
 end
+vim.opt.tabline = "%!v:lua.my_tabline()"
 
-vim.opt.tabline = "%!v:lua.protocol_tabline()"
-
+-- Applied at VimEnter so they land after anything else touches highlights
+-- during startup. Transparent backgrounds let the terminal's own theme show.
 vim.api.nvim_create_autocmd("VimEnter", {
     callback = function()
         local transparent_groups = {
             "Normal", "NonText", "LineNr", "SignColumn", "EndOfBuffer",
-            "VertSplit", "TabLineFill", "NvimTreeNormal", "NvimTreeNormalNC",
-            "NvimTreeVertSplit", "NvimTreeEndOfBuffer", "NvimTreeRootFolder",
-            "NvimTreeEmptyFolderName",
+            "VertSplit", "TabLineFill",
+            "NvimTreeNormal", "NvimTreeNormalNC", "NvimTreeVertSplit", "NvimTreeEndOfBuffer",
+            "NvimTreeRootFolder", "NvimTreeEmptyFolderName"
         }
         for _, group in ipairs(transparent_groups) do
             vim.cmd("highlight " .. group .. " ctermbg=NONE guibg=NONE")
         end
         vim.cmd("highlight CursorLine ctermbg=NONE guibg=NONE")
         vim.cmd("highlight CursorLineNr cterm=none ctermfg=11")
+        vim.cmd("highlight NvimTreeRootFolder ctermfg=NONE guifg=NONE ctermbg=NONE guibg=NONE")
         vim.cmd("highlight TabLineSel ctermbg=NONE guibg=NONE ctermfg=10 guifg=Green cterm=bold gui=bold")
         vim.cmd("highlight TabLine ctermbg=NONE guibg=NONE ctermfg=Gray guifg=Gray")
         vim.cmd("highlight StatusLine cterm=NONE ctermbg=2 ctermfg=0")

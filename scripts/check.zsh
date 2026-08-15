@@ -9,6 +9,8 @@ required=(
   LICENSE
   install.zsh
   shell/protocol.zsh
+  scripts/doctor.zsh
+  tests/shell_test.zsh
   ghostty/bin/ghostty-theme
   nvim/init.lua
   agent/AGENTS.md
@@ -23,7 +25,7 @@ for required_path in $required; do
   fi
 done
 
-for script in "$root/install.zsh" "$root/scripts/check.zsh" "$root/knowledge-vault/init.zsh" "$root/ghostty/bin/ghostty-theme"; do
+for script in "$root/install.zsh" "$root/scripts/check.zsh" "$root/scripts/doctor.zsh" "$root/tests/shell_test.zsh" "$root/knowledge-vault/init.zsh" "$root/ghostty/bin/ghostty-theme"; do
   /bin/zsh -n "$script"
   if [[ ! -x "$script" ]]; then
     print -u2 "script is not executable: ${script#$root/}"
@@ -32,6 +34,12 @@ for script in "$root/install.zsh" "$root/scripts/check.zsh" "$root/knowledge-vau
 done
 
 /bin/zsh -n "$root/shell/protocol.zsh"
+
+# The shell module must also *source* cleanly, with status 0, in a bare shell
+# running under errexit -- syntax checking alone missed a trailing &&-list
+# that returned nonzero whenever an optional tool was absent.
+PROTOCOL_CHECK_MODULE="$root/shell/protocol.zsh" \
+  /bin/zsh -fec 'source "$PROTOCOL_CHECK_MODULE"'
 python3 -m py_compile "$root/agent/hooks/semantic-title.py"
 
 if grep -RIE '/Users/|Co-Authored-By:|T-[A-Z][0-9-]+' \
