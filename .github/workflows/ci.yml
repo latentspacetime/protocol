@@ -16,3 +16,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate configuration
         run: ./scripts/check.zsh
+      - name: Shell behavior tests
+        run: ./tests/shell_test.zsh
