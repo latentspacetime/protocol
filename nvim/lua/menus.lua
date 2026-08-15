@@ -1,11 +1,19 @@
+-- Single-keystroke action menus and the clipboard helpers behind them.
+-- Three surfaces share the pattern: 'm' in a file tab (file_buffer_menu,
+-- mapped in keymaps.lua), 'm' on a tree node (tree_node_menu, wired in
+-- tree.lua), and 'm' in the OTemp scratch pad (otemp.lua, built from the
+-- primitives this module exports so every menu behaves identically).
+-- copy_to_system_clipboard and file_buffer_menu stay on _G: they are invoked
+-- from keymap command strings and from tree.lua.
+
+-- Print a message, then clear the echo area after duration_ms.
 local function flash(message, duration_ms)
     print(message)
-    vim.defer_fn(function()
-        vim.cmd("echo ''")
-        vim.cmd("redraw")
-    end, duration_ms)
+    vim.defer_fn(function() vim.cmd("echo ''"); vim.cmd("redraw") end, duration_ms)
 end
 
+-- Reads one key as a menu choice; "" means cancelled (interrupt or a
+-- special key that has no single-character form).
 local function read_menu_char()
     local ok, char_code = pcall(vim.fn.getchar)
     vim.cmd("redraw")
@@ -15,67 +23,62 @@ local function read_menu_char()
     return ""
 end
 
-function _G.copy_to_system_clipboard(value)
-    vim.fn.setreg("+", value)
-    vim.fn.setreg("*", value)
-    local display_value = value
-    local max_length = math.max(vim.o.columns - 10, 20)
-    if #display_value > max_length then
-        display_value = display_value:sub(1, max_length - 3) .. "..."
+function _G.copy_to_system_clipboard(path)
+    vim.fn.setreg("+", path)
+    vim.fn.setreg("*", path)
+    local display_path = path
+    if #display_path > (vim.o.columns - 10) then
+        display_path = string.sub(display_path, 1, vim.o.columns - 13) .. "..."
     end
     vim.cmd("redraw")
-    flash("Copied: " .. display_value, 2500)
+    flash("Copied: " .. display_path, 2500)
 end
 
 local function copy_buffer_content()
-    local cursor = vim.fn.getpos(".")
+    local save_cursor = vim.fn.getpos(".")
     vim.cmd("keepjumps %y+")
     vim.cmd("keepjumps %y*")
-    vim.fn.setpos(".", cursor)
-    flash("Content copied to clipboard.", 2500)
+    vim.fn.setpos(".", save_cursor)
+    flash("✓ Content copied to clipboard.", 2500)
 end
 
 local function duplicate_current_file()
-    local source_path = vim.fn.expand("%:p")
-    if source_path == "" then
-        print("Cannot duplicate a buffer without a file path.")
+    local src_path = vim.fn.expand("%:p")
+    if src_path == "" then
+        print("Cannot duplicate: Buffer has no file path.")
         return
     end
-
-    local directory = vim.fn.expand("%:p:h")
-    local stem = vim.fn.expand("%:t:r")
-    local extension = vim.fn.expand("%:e")
-    if extension ~= "" then extension = "." .. extension end
-
-    local suffix = 1
-    local destination = directory .. "/" .. stem .. "_" .. suffix .. extension
-    while vim.fn.filereadable(destination) == 1 do
-        suffix = suffix + 1
-        destination = directory .. "/" .. stem .. "_" .. suffix .. extension
+    local dir = vim.fn.expand("%:p:h")
+    local name = vim.fn.expand("%:t:r")
+    local ext = vim.fn.expand("%:e")
+    if ext ~= "" then ext = "." .. ext end
+    local dest = dir .. "/" .. name .. "_1" .. ext
+    local i = 1
+    while vim.fn.filereadable(dest) == 1 do
+        i = i + 1
+        dest = dir .. "/" .. name .. "_" .. i .. ext
     end
-
     local content = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-    if vim.fn.writefile(content, destination) ~= 0 then
-        print("Duplicate failed: could not write " .. destination)
-        return
-    end
-    vim.cmd("tabedit " .. vim.fn.fnameescape(destination))
-    print("Duplicated: " .. vim.fn.fnamemodify(destination, ":t"))
+    vim.fn.writefile(content, dest)
+    vim.cmd("tabedit " .. vim.fn.fnameescape(dest))
+    vim.wo.number = true
+    vim.wo.relativenumber = false
+    print("Duplicated: " .. vim.fn.fnamemodify(dest, ":t"))
 end
 
 local function unwrap_clipboard()
-    local text = vim.fn.getreg("+")
-    if text == "" then
+    local text = vim.fn.getreg('+')
+    if text == '' then
         flash("Clipboard is empty.", 1500)
         return
     end
-    local cleaned = text:gsub("(%S) *\n  +", "%1 ")
+    local cleaned = text:gsub('(%S) *\n  +', '%1 ')
     if cleaned == text then
         flash("No wrap artifacts found.", 1500)
         return
     end
-    vim.fn.setreg("+", cleaned)
-    vim.fn.setreg("*", cleaned)
+    vim.fn.setreg('+', cleaned)
+    vim.fn.setreg('*', cleaned)
     flash("Clipboard unwrapped.", 2500)
 end
 
@@ -83,46 +86,46 @@ vim.api.nvim_create_user_command("ClipFix", unwrap_clipboard, {})
 
 local M = {}
 
+-- Menu primitives, exported so other menu surfaces (otemp.lua) share one
+-- mechanism for prompting, confirmation flashes, and whole-buffer copy.
+M.flash = flash
+M.read_menu_char = read_menu_char
+M.copy_buffer_content = copy_buffer_content
+
 function M.rename_current_file()
-    local source_path = vim.fn.expand("%:p")
-    if source_path == "" then
-        print("Cannot rename a buffer without a file path.")
+    local src = vim.fn.expand("%:p")
+    if src == "" then
+        print("Cannot rename: Buffer has no file path.")
         return
     end
     if vim.bo.modified then
         print("Save the buffer before renaming.")
         return
     end
-
-    local old_name = vim.fn.fnamemodify(source_path, ":t")
+    local old_name = vim.fn.fnamemodify(src, ":t")
     local new_name = vim.fn.input("Rename to: ", old_name)
     vim.cmd("redraw")
     if new_name == "" or new_name == old_name then
         flash("Rename cancelled.", 1000)
         return
     end
-    if new_name:find("/", 1, true) then
-        print("Rename failed: enter a file name, not a path.")
+    local dest = vim.fn.fnamemodify(src, ":h") .. "/" .. new_name
+    -- The lowercase comparison permits case-only renames on APFS, where the
+    -- destination "already exists" as the source itself.
+    local case_only = dest:lower() == src:lower()
+    if not case_only and (vim.fn.filereadable(dest) == 1 or vim.fn.isdirectory(dest) == 1) then
+        print("Cannot rename: " .. new_name .. " already exists.")
         return
     end
-
-    local destination = vim.fn.fnamemodify(source_path, ":h") .. "/" .. new_name
-    local case_only = destination:lower() == source_path:lower()
-    if not case_only and (vim.fn.filereadable(destination) == 1 or vim.fn.isdirectory(destination) == 1) then
-        print("Cannot rename: destination already exists.")
-        return
-    end
-
-    local ok, error_message = vim.loop.fs_rename(source_path, destination)
+    local ok, err = vim.loop.fs_rename(src, dest)
     if not ok then
-        print("Rename failed: " .. tostring(error_message))
+        print("Rename failed: " .. tostring(err))
         return
     end
-
-    local old_buffer = vim.api.nvim_get_current_buf()
-    vim.cmd("keepalt edit " .. vim.fn.fnameescape(destination))
-    if vim.api.nvim_get_current_buf() ~= old_buffer then
-        vim.api.nvim_buf_delete(old_buffer, { force = true })
+    local old_buf = vim.api.nvim_get_current_buf()
+    vim.cmd("keepalt edit " .. vim.fn.fnameescape(dest))
+    if vim.api.nvim_get_current_buf() ~= old_buf then
+        vim.api.nvim_buf_delete(old_buf, { force = true })
     end
     flash("Renamed to " .. new_name, 2500)
 end
@@ -130,34 +133,27 @@ end
 function M.delete_current_file()
     local path = vim.fn.expand("%:p")
     if path == "" then
-        print("Cannot delete a buffer without a file path.")
+        print("Cannot delete: Buffer has no file path.")
         return
     end
-    if vim.bo.modified then
-        print("Save or discard buffer changes before deleting.")
-        return
-    end
-
     local name = vim.fn.fnamemodify(path, ":t")
     print("Delete " .. name .. "? (y/n)")
     if read_menu_char():lower() ~= "y" then
         flash("Delete cancelled.", 1000)
         return
     end
-
-    local ok, error_message = vim.loop.fs_unlink(path)
+    local ok, err = vim.loop.fs_unlink(path)
     if not ok then
-        print("Delete failed: " .. tostring(error_message))
+        print("Delete failed: " .. tostring(err))
         return
     end
-
-    local buffer = vim.api.nvim_get_current_buf()
+    local buf = vim.api.nvim_get_current_buf()
+    -- A deleted file's tab has no reason to stay open; CORE (tab 1) and
+    -- split layouts keep their window and just drop the buffer.
     if vim.fn.tabpagenr() > 1 and vim.fn.winnr("$") == 1 then
         vim.cmd("tabclose")
     end
-    if vim.api.nvim_buf_is_valid(buffer) then
-        vim.api.nvim_buf_delete(buffer, { force = true })
-    end
+    vim.api.nvim_buf_delete(buf, { force = true })
     flash("Deleted " .. name, 2500)
 end
 
@@ -181,16 +177,17 @@ function _G.file_buffer_menu()
     end)
 end
 
+-- Instant menu for the tree node under the cursor; api is nvim-tree's api module.
 function M.tree_node_menu(node, api)
-    print("MENU: (a)create (d)delete (r)rename (p)copy-path (x)cut (v)paste")
-    local char = read_menu_char():lower()
+    print("MENU: (a)Create (d)Delete (r)Rename (p)CopyPath (x)Cut (v)Paste")
+    local char = read_menu_char()
     if char == "a" then api.fs.create(node)
     elseif char == "d" then api.fs.remove(node)
     elseif char == "r" then api.fs.rename(node)
     elseif char == "p" then _G.copy_to_system_clipboard(node.absolute_path)
     elseif char == "x" then api.fs.cut(node)
     elseif char == "v" then api.fs.paste(node)
-    else flash("Cancelled.", 1000) end
+    else print("Cancelled") end
 end
 
 return M
