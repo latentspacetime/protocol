@@ -1,5 +1,5 @@
--- fzf-powered file search (<Leader>p), repository picker (<Leader>r in a
--- CORE terminal), and the smart :Rg text search.
+-- fzf-powered file search (<Leader>p), repository picker (<Leader>r from a
+-- CORE terminal's normal mode), and the smart :Rg text search.
 --
 -- The fzf integration is deliberately Vimscript: fzf.vim's sink*/g:fzf_action
 -- contract expects Vimscript funcrefs, and the delayed-echo helpers are timer
@@ -120,9 +120,6 @@ function M.restore_repository_picker_target(target)
             return
         end
         vim.api.nvim_set_current_win(target.winid)
-        if target.resume_insert and vim.bo[target.bufnr].buftype == "terminal" then
-            vim.cmd("startinsert")
-        end
     end)
 end
 
@@ -137,45 +134,39 @@ function M.open_repository_picker(target)
         vim.notify(color_error, vim.log.levels.ERROR)
         return
     end
-    vim.fn.StartRepositoryFzf(
-        entries,
-        target.winid,
-        target.bufnr,
-        target.channel,
-        target.resume_insert
-    )
+    vim.fn.StartRepositoryFzf(entries, target.winid, target.bufnr, target.channel)
 end
 
 function M.attach_repository_picker(bufnr)
+    -- Normal mode only. A terminal-job-mode mapping whose lhs starts with
+    -- <Leader> (space) holds every space typed into the terminal in typeahead
+    -- for 'timeoutlen' while Neovim waits for the rest of the mapping.
     for _, variant in ipairs({ 'r', 'R' }) do
-        vim.keymap.set({ 'n', 't' }, '<Leader>' .. variant, function()
+        vim.keymap.set('n', '<Leader>' .. variant, function()
             local current_buf = vim.api.nvim_get_current_buf()
             M.open_repository_picker({
                 winid = vim.api.nvim_get_current_win(),
                 bufnr = current_buf,
                 channel = vim.bo[current_buf].channel,
-                resume_insert = vim.api.nvim_get_mode().mode:sub(1, 1) == "t",
             })
         end, { buffer = bufnr, silent = true, desc = "Pick workspace repository" })
     end
 end
 
 -- Called by fzf's Vimscript funcrefs below.
-function _G.repository_picker_handle(winid, bufnr, channel, resume_insert, lines)
+function _G.repository_picker_handle(winid, bufnr, channel, lines)
     return M.handle_repository_selection({
         winid = winid,
         bufnr = bufnr,
         channel = channel,
-        resume_insert = resume_insert,
     }, lines)
 end
 
-function _G.repository_picker_restore(winid, bufnr, channel, resume_insert)
+function _G.repository_picker_restore(winid, bufnr, channel)
     M.restore_repository_picker_target({
         winid = winid,
         bufnr = bufnr,
         channel = channel,
-        resume_insert = resume_insert,
     })
 end
 
@@ -270,17 +261,17 @@ function! StartGlobalRg(grep_cmd)
     \ }
     call fzf#vim#grep(a:grep_cmd, 1, fzf#vim#with_preview(l:spec), 0)
 endfunction
-function! RepositoryPickerHandler(winid, bufnr, channel, resume_insert, lines)
-    call v:lua.repository_picker_handle(a:winid, a:bufnr, a:channel, a:resume_insert, a:lines)
+function! RepositoryPickerHandler(winid, bufnr, channel, lines)
+    call v:lua.repository_picker_handle(a:winid, a:bufnr, a:channel, a:lines)
 endfunction
-function! RepositoryPickerExit(winid, bufnr, channel, resume_insert, status)
-    call v:lua.repository_picker_restore(a:winid, a:bufnr, a:channel, a:resume_insert)
+function! RepositoryPickerExit(winid, bufnr, channel, status)
+    call v:lua.repository_picker_restore(a:winid, a:bufnr, a:channel)
 endfunction
-function! StartRepositoryFzf(directories, winid, bufnr, channel, resume_insert)
+function! StartRepositoryFzf(directories, winid, bufnr, channel)
     let l:spec = {
     \ 'source': a:directories,
-    \ 'sink*': function('RepositoryPickerHandler', [a:winid, a:bufnr, a:channel, a:resume_insert]),
-    \ 'exit': function('RepositoryPickerExit', [a:winid, a:bufnr, a:channel, a:resume_insert]),
+    \ 'sink*': function('RepositoryPickerHandler', [a:winid, a:bufnr, a:channel]),
+    \ 'exit': function('RepositoryPickerExit', [a:winid, a:bufnr, a:channel]),
     \ 'options': ['--ansi', '--prompt', 'Repos> ', '--expect=tab', '--no-multi']
     \ }
     call fzf#run(fzf#wrap('workspace-directories', l:spec, 0))

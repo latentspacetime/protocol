@@ -58,7 +58,7 @@ vim.fn.writefile({ "special-repo=68" }, color_config)
 
 check("Vimscript fzf bridge accepts Tab for an available directory",
     vim.fn.RepositoryPickerHandler(
-        0, 0, 0, false, { "tab", "\27[38;5;110mSpace Repo\27[0m" }
+        0, 0, 0, { "tab", "\27[38;5;110mSpace Repo\27[0m" }
     ) == 0)
 check("Tab copies the absolute path to both clipboard registers",
     vim.fn.getreg("+") == root .. "/Space Repo" and vim.fn.getreg("*") == root .. "/Space Repo")
@@ -71,7 +71,7 @@ local function open_terminal(cwd)
     local winid = vim.api.nvim_get_current_win()
     local bufnr = vim.api.nvim_get_current_buf()
     local channel = vim.fn.termopen({ "/bin/sh" }, { cwd = cwd })
-    return { winid = winid, bufnr = bufnr, channel = channel, resume_insert = false }
+    return { winid = winid, bufnr = bufnr, channel = channel }
 end
 
 local terminal_one = open_terminal(root)
@@ -85,9 +85,17 @@ vim.api.nvim_set_current_win(terminal_one.winid)
 check("repository picker has buffer-local normal-mode case-proof maps",
     vim.fn.maparg("<Space>r", "n", false, true).buffer == 1
     and vim.fn.maparg("<Space>R", "n", false, true).buffer == 1)
-check("repository picker has buffer-local terminal-mode case-proof maps",
-    vim.fn.maparg("<Space>r", "t", false, true).buffer == 1
-    and vim.fn.maparg("<Space>R", "t", false, true).buffer == 1)
+-- Regression guard: a terminal-job-mode mapping starting with the space
+-- leader makes every space typed into a terminal wait out 'timeoutlen'.
+local function space_prefixed_terminal_maps(bufnr)
+    local offenders = {}
+    for _, map in ipairs(vim.api.nvim_buf_get_keymap(bufnr, "t")) do
+        if map.lhs:sub(1, 1) == " " then table.insert(offenders, map.lhs) end
+    end
+    return offenders
+end
+check("no terminal-job-mode mapping starts with the space leader",
+    #space_prefixed_terminal_maps(terminal_one.bufnr) == 0)
 
 local original_open_picker = search.open_repository_picker
 local mapped_target
@@ -124,7 +132,7 @@ check("another CORE shell keeps its directory",
 
 vim.api.nvim_set_current_win(terminal_two.winid)
 vim.fn.RepositoryPickerExit(
-    terminal_one.winid, terminal_one.bufnr, terminal_one.channel, false, 130
+    terminal_one.winid, terminal_one.bufnr, terminal_one.channel, 130
 )
 check("fzf cancellation restores the invoking terminal window",
     vim.wait(1000, function() return vim.api.nvim_get_current_win() == terminal_one.winid end, 10))
