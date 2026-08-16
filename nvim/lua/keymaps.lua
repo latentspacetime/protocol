@@ -9,23 +9,6 @@ for i = 2, 9 do
     map('n', '<Leader>' .. i, '<cmd>' .. i .. 'tabnext<CR>', { silent = true, desc = "Switch to Tab " .. i })
 end
 
--- Override native gt/gT to use pure Ex commands
-map('n', 'gt', function()
-    if vim.v.count > 0 then
-        vim.cmd(vim.v.count .. "tabnext")
-    else
-        vim.cmd("tabnext")
-    end
-end, { silent = true })
-
-map('n', 'gT', function()
-    if vim.v.count > 0 then
-        vim.cmd(vim.v.count .. "tabprevious")
-    else
-        vim.cmd("tabprevious")
-    end
-end, { silent = true })
-
 map('n', '<Leader>f', ':BLines<CR>', { silent = true, desc = "Search Current File" })
 map('n', '<Leader>F', ':Rg<CR>', { silent = true, desc = "Search Global Project" })
 
