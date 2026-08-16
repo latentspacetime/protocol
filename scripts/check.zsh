@@ -7,6 +7,7 @@ root="${0:A:h:h}"
 required=(
   README.md
   LICENSE
+  SETUP.md
   install.zsh
   shell/protocol.zsh
   scripts/doctor.zsh
@@ -42,8 +43,10 @@ PROTOCOL_CHECK_MODULE="$root/shell/protocol.zsh" \
   /bin/zsh -fec 'source "$PROTOCOL_CHECK_MODULE"'
 python3 -m py_compile "$root/agent/hooks/semantic-title.py"
 
+# In a linked git worktree, .git is a pointer file whose content is an
+# absolute path, so it must be excluded by name as well as by directory.
 if grep -RIE '/Users/|Co-Authored-By:|T-[A-Z][0-9-]+' \
-  --exclude-dir=.git --exclude='check.zsh' "$root" >/dev/null; then
+  --exclude-dir=.git --exclude=.git --exclude='check.zsh' "$root" >/dev/null; then
   print -u2 "privacy check failed: local path, task ID, or attribution trailer found"
   exit 1
 fi

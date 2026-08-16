@@ -51,9 +51,10 @@ assert_contains "$output" "3 entries in $PROTOCOL_FRICTION_LOG" "listing reports
 assert_contains "$output" "branch context test" "listing shows recent entries"
 
 # Sandboxed invocations override ZDOTDIR as well as HOME so the real user's
-# zsh startup files never run inside the test.
+# zsh startup files never run inside the test, and XDG_CONFIG_HOME so the
+# installer's git-ignore step can never touch the real global ignore file.
 in_sandbox() {
-  HOME="$sandbox" ZDOTDIR="$sandbox" "$@"
+  HOME="$sandbox" ZDOTDIR="$sandbox" XDG_CONFIG_HOME="$sandbox/.config" "$@"
 }
 
 # doctor: on a machine without protocol installed it must fail honestly,
@@ -73,5 +74,31 @@ install_output=$(in_sandbox "$root/install.zsh")
 assert_contains "$install_output" "protocol installed" "installer succeeds in sandbox HOME"
 doctor_output=$(in_sandbox "$root/scripts/doctor.zsh" 2>&1) || true
 assert_contains "$doctor_output" "installed links and shell integration" "doctor confirms links after install"
+
+# Global git ignore: install appends every agent instruction pattern to the
+# sandbox ignore file.
+sandbox_ignore="$sandbox/.config/git/ignore"
+for pattern in AGENTS.md CLAUDE.md .claude/; do
+  assert_contains "$(cat "$sandbox_ignore")" "$pattern" "git ignore contains $pattern"
+done
+
+# Reinstalling must not duplicate the patterns.
+install_output=$(in_sandbox "$root/install.zsh")
+if (( $(grep -Fcx -- "AGENTS.md" "$sandbox_ignore") != 1 )); then
+  print -u2 -- "FAIL reinstall duplicates git ignore lines"
+  exit 1
+fi
+(( assertions += 1 ))
+
+# A single missing pattern is restored without duplicating the others.
+grep -Fvx -- "CLAUDE.md" "$sandbox_ignore" > "$sandbox_ignore.tmp"
+mv "$sandbox_ignore.tmp" "$sandbox_ignore"
+install_output=$(in_sandbox "$root/install.zsh")
+assert_contains "$(cat "$sandbox_ignore")" "CLAUDE.md" "removed pattern is restored"
+if (( $(grep -Fcx -- "AGENTS.md" "$sandbox_ignore") != 1 )); then
+  print -u2 -- "FAIL partial repair duplicates git ignore lines"
+  exit 1
+fi
+(( assertions += 1 ))
 
 print "shell tests passed ($assertions assertions)"

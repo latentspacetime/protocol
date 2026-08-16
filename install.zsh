@@ -56,7 +56,40 @@ ensure_shell_source() {
   } >> "$zshrc"
 }
 
+# Repo-level agent instruction files stay untracked by default; committing one
+# becomes a deliberate `git add -f`. A global ignore never affects files a
+# repository already tracks.
+agent_ignore_lines=(AGENTS.md CLAUDE.md .claude/)
+
+ensure_git_ignore() {
+  local ignore_file
+  ignore_file="$(git config --global --path --get core.excludesFile 2>/dev/null || true)"
+  [[ -n "$ignore_file" ]] || ignore_file="${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore"
+
+  local -a missing_lines=()
+  local line
+  for line in "${agent_ignore_lines[@]}"; do
+    if [[ -f "$ignore_file" ]] && grep -Fqx -- "$line" "$ignore_file"; then
+      continue
+    fi
+    missing_lines+=("$line")
+  done
+
+  if (( ${#missing_lines} == 0 )); then
+    return
+  fi
+
+  if [[ "$mode" == "--check" ]]; then
+    print -u2 "missing agent ignore line(s) in $ignore_file: ${missing_lines[*]}"
+    return 1
+  fi
+
+  mkdir -p "${ignore_file:h}"
+  print -rl -- "${missing_lines[@]}" >> "$ignore_file"
+}
+
 ensure_shell_source
+ensure_git_ignore
 ensure_link "$protocol_root/nvim" "$HOME/.config/nvim"
 ensure_link "$protocol_root/ghostty" "$HOME/.config/ghostty"
 ensure_link "$protocol_root/agent/AGENTS.md" "$HOME/.claude/CLAUDE.md"

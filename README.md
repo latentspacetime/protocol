@@ -13,6 +13,7 @@ automation.
 
 | Path | Purpose |
 | --- | --- |
+| `SETUP.md` | Interview a coding agent follows to install protocol for a user |
 | `shell/protocol.zsh` | Shell prompt, command wrappers, and shortcuts |
 | `ghostty/` | Terminal defaults and live theme picker |
 | `nvim/` | Neovim configuration and pinned plugin versions |
@@ -42,10 +43,13 @@ Clone the repository anywhere, then run:
 ./install.zsh --check
 ```
 
-The installer is deliberately non-destructive. It creates missing links and
-adds one marked source block to `~/.zshrc`, but refuses to replace regular
-files or unrelated links. Existing configuration must be reviewed and moved
-manually before installation.
+The installer is deliberately non-destructive. It creates missing links, adds
+one marked source block to `~/.zshrc`, and appends `AGENTS.md`, `CLAUDE.md`,
+and `.claude/` to the global git ignore so repository-level agent instruction
+files stay untracked by default; tracking one becomes a deliberate
+`git add -f`, and files a repository already tracks are unaffected. It refuses
+to replace regular files or unrelated links. Existing configuration must be
+reviewed and moved manually before installation.
 
 Set the workspace root before sourcing the shell module when the default
 `$HOME/Code` is not appropriate:
@@ -53,6 +57,14 @@ Set the workspace root before sourcing the shell module when the default
 ```zsh
 export CODE_WORKSPACE="$HOME/path/to/code"
 ```
+
+## Agent-Guided Setup
+
+A coding agent can perform the entire installation, including every decision
+above. Point Claude Code, Codex, or OpenCode at the repository and ask it to
+follow [SETUP.md](SETUP.md), which contains the full interview: workspace
+location, editor and terminal adoption, harness links, git ignore behavior,
+friction-log routing, and verification with `doctor`.
 
 ## Shell Commands
 
