@@ -38,32 +38,40 @@ end, { silent = true })
 -- 'm' opens the file action menu — deliberately shadows vim's set-mark key.
 map('n', 'm', '<cmd>lua _G.file_buffer_menu()<CR>', { silent = true })
 
-map('n', '<Leader>q', function()
-    vim.cmd("1tabnext")
-    local ok, _ = pcall(vim.cmd, "tabonly")
-    if ok then
-        print("✓ Closed all non-core tabs.")
-    else
-        print("Could not close tabs. Unsaved changes?")
-    end
-end, { silent = true, desc = "Quit all non-core tabs" })
+for _, q_variant in ipairs({ 'q', 'Q' }) do
+    map('n', '<Leader>' .. q_variant, function()
+        vim.cmd("1tabnext")
+        local ok, _ = pcall(vim.cmd, "tabonly")
+        if ok then
+            print("✓ Closed all non-core tabs.")
+        else
+            print("Could not close tabs. Unsaved changes?")
+        end
+    end, { silent = true, desc = "Quit all non-core tabs" })
+end
 map('n', '<C-l>', ':tabnext<CR>', { silent = true })
 map('n', '<C-h>', ':tabprev<CR>', { silent = true })
 map('n', '<F2>', ':NvimTreeToggle<CR>', { silent = true })
-map({ 'n', 'v' }, '<Leader>p', function()
-    vim.fn.StartGlobalFzf(workspace.code_root)
-end, { silent = true })
+for _, p_variant in ipairs({ 'p', 'P' }) do
+    map({ 'n', 'v' }, '<Leader>' .. p_variant, function()
+        vim.fn.StartGlobalFzf(workspace.code_root)
+    end, { silent = true })
+end
 -- The jk escape hatch works in every capitalization, in both modes that need
 -- escaping. Caps lock inverts letter case at the terminal (2026-08-15
 -- input-diagnostics.log: jk arrived as "JK"), and the one mapping that gets
 -- you out of a bad state is exactly the one that must not be case-sensitive.
--- Other maps (m, gt, <Leader>p) stay lowercase-only: they fail loudly under
--- caps lock, which is recoverable; a dead escape hatch is not.
+-- Other maps (m, gt) stay lowercase-only: they fail loudly under caps lock,
+-- which is recoverable; a dead escape hatch is not.
 for _, jk_variant in ipairs({ 'jk', 'JK', 'Jk', 'jK' }) do
     map('t', jk_variant, '<C-\\><C-n>')
     map('i', jk_variant, '<Esc>')
 end
 
-map('n', '<Leader>u', '<cmd>ClipFix<CR>', { silent = true, desc = "Unwrap clipboard (strip agent wrap artifacts)" })
+for _, u_variant in ipairs({ 'u', 'U' }) do
+    map('n', '<Leader>' .. u_variant, '<cmd>ClipFix<CR>', { silent = true, desc = "Unwrap clipboard (strip agent wrap artifacts)" })
+end
 
-map('n', '<Leader>o', function() require("otemp").toggle() end, { silent = true, desc = "Toggle OTemp scratch pad" })
+for _, o_variant in ipairs({ 'o', 'O' }) do
+    map('n', '<Leader>' .. o_variant, function() require("otemp").toggle() end, { silent = true, desc = "Toggle OTemp scratch pad" })
+end
