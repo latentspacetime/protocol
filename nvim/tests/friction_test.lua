@@ -44,8 +44,8 @@ friction.log("headless test entry", function(code, text)
     finish()
 end)
 
--- The shell round trip normally takes well under a second; a hang here means
--- the interactive zsh never produced ugh (missing source line in ~/.zshrc).
+-- The shell round trip normally takes well under a second; a hang means the
+-- interactive zsh failed to expose ugh, commonly through source resolution.
 vim.defer_fn(function()
     if not done then
         done = true

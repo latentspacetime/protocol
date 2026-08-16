@@ -35,9 +35,12 @@ anything else.
 1. Read the registry in full. Its own maintenance section is authoritative if
    it and this skill disagree.
 2. Identify protocol-level changes from the current session and from any
-   recent work the user names. Check shell startup files, the editor and
-   terminal configuration directories, the global git ignore, and the harness
-   instruction and skill sources.
+   recent work the user names. Resolve the configured live source first:
+   inspect `PROTOCOL_CONFIG_ROOT` when it points to a separate configuration
+   repository, then validate the shell, editor, and terminal runtime paths.
+   Check the global git ignore and harness instruction and skill sources too.
+   Read history from the source repository instead of assuming runtime
+   symlinks are Git roots.
 3. For each change, update the matching registry row and append a change-log
    row with a local timestamp, category, one-line description, and status.
 4. Count `Unsynced` change-log rows. Fewer than three: stop and report the
