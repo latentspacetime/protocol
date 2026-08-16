@@ -7,10 +7,15 @@
 -- buffer, so editing, search, and paste are all native; the only keys the pad
 -- adds are buffer-local: 'm' (menu, same convention as file tabs and tree
 -- nodes) and <Esc> in normal mode (close — from insert, Esc Esc exits).
+-- The float title tracks the mode with a colored INSERT/NORMAL chip; the
+-- insert variant spells out the path to the menu, since m/esc only act as
+-- hinted in normal mode.
 local workspace = require("workspace")
 local menus = require("menus")
 
 local M = {}
+
+local augroup = vim.api.nvim_create_augroup("OTemp", { clear = true })
 
 local scratch_buf = nil  -- session-lifetime scratch buffer, created lazily
 local float_win = nil    -- current float window, nil while hidden
@@ -119,6 +124,35 @@ local function ensure_scratch_buf()
     return scratch_buf
 end
 
+-- Title as [text, highlight] chunks; the chip groups OTempInsert/OTempNormal
+-- are defined with the rest of the palette in appearance.lua.
+local function float_title(mode)
+    if mode:find("^i") then
+        return {
+            { " OTemp ", "FloatTitle" },
+            { " INSERT ", "OTempInsert" },
+            { " esc, then m: menu ", "FloatTitle" },
+        }
+    end
+    return {
+        { " OTemp ", "FloatTitle" },
+        { " NORMAL ", "OTempNormal" },
+        { " m: menu · esc: close ", "FloatTitle" },
+    }
+end
+
+vim.api.nvim_create_autocmd("ModeChanged", {
+    group = augroup,
+    callback = function()
+        if not (float_win and vim.api.nvim_win_is_valid(float_win)) then return end
+        if vim.api.nvim_get_current_win() ~= float_win then return end
+        vim.api.nvim_win_set_config(float_win, {
+            title = float_title(vim.v.event.new_mode),
+            title_pos = "center",
+        })
+    end,
+})
+
 local function open_float()
     local buf = ensure_scratch_buf()
     local width = math.floor(vim.o.columns * 0.7)
@@ -130,7 +164,9 @@ local function open_float()
         col = math.floor((vim.o.columns - width) / 2),
         row = math.floor((vim.o.lines - height) / 2),
         border = "rounded",
-        title = " OTemp — m: menu · esc: close ",
+        -- startinsert below lands after this function returns; setting the
+        -- matching title here avoids a one-frame normal-mode title.
+        title = float_title(scratch_is_empty() and "i" or "n"),
         title_pos = "center",
     })
     vim.wo[float_win].linebreak = true

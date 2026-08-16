@@ -27,7 +27,24 @@ local otemp = require("otemp")
 local workspace = require("workspace")
 workspace.otemp_dir = vim.fn.tempname() .. "-otemp-saves"
 
-local step2, step3
+local function float_title_chunks()
+    return vim.api.nvim_win_get_config(vim.api.nvim_get_current_win()).title or {}
+end
+
+local function float_title_text()
+    local text = ""
+    for _, chunk in ipairs(float_title_chunks()) do text = text .. chunk[1] end
+    return text
+end
+
+local function float_title_hl(substr)
+    for _, chunk in ipairs(float_title_chunks()) do
+        if chunk[1]:find(substr, 1, true) then return chunk[2] end
+    end
+    return nil
+end
+
+local step2, step3, step4, step5
 
 vim.defer_fn(function()
     otemp.toggle()
@@ -42,6 +59,9 @@ end, 700)
 
 step2 = function()
     check("starts in insert mode when empty", vim.api.nvim_get_mode().mode == "i")
+    check("insert-mode title shows escape path",
+        float_title_text():find("INSERT", 1, true) ~= nil)
+    check("insert chip uses OTempInsert color", float_title_hl("INSERT") == "OTempInsert")
     vim.cmd("stopinsert")
     vim.api.nvim_buf_set_lines(0, 0, -1, false, { "line one", "line two", "line three" })
     vim.api.nvim_win_set_cursor(0, { 2, 3 })
@@ -58,6 +78,11 @@ end
 
 step3 = function()
     check("reopen with content stays in normal mode", vim.api.nvim_get_mode().mode == "n")
+    check("normal-mode title shows menu hint",
+        float_title_text():find("NORMAL", 1, true) ~= nil
+        and float_title_text():find("m: menu", 1, true) ~= nil
+        and not float_title_text():find("INSERT", 1, true))
+    check("normal chip uses OTempNormal color", float_title_hl("NORMAL") == "OTempNormal")
     otemp.save_snapshot()
     local saved = vim.fn.glob(workspace.otemp_dir .. "/temptext-*.md", 0, 1)
     check("save writes one snapshot file", #saved == 1)
@@ -89,5 +114,20 @@ step3 = function()
     otemp.close()
     check("close() hides the float",
         vim.api.nvim_win_get_config(vim.api.nvim_get_current_win()).relative == "")
+    otemp.toggle() -- pad is empty after the clear, so this reopens in insert
+    vim.defer_fn(step4, 50)
+end
+
+step4 = function()
+    vim.cmd("stopinsert")
+    vim.defer_fn(step5, 50)
+end
+
+step5 = function()
+    -- The float was already open when the mode flipped, so only the
+    -- ModeChanged autocmd can have retitled it.
+    check("title flips to normal hints on mode change",
+        float_title_text():find("NORMAL", 1, true) ~= nil
+        and not float_title_text():find("INSERT", 1, true))
     finish()
 end
