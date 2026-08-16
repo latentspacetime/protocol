@@ -46,6 +46,15 @@ Default: inside the workspace from question 1. Clone it there if this copy is
 somewhere temporary. All installed links point into the clone, so it should
 stay where it lands.
 
+Ask: "Should the public protocol repository own the live shell, Neovim, and
+Ghostty paths, or do you maintain those files in a separate local repository?"
+
+Default: protocol owns the live paths. If the user chooses a separate source,
+verify that it contains `shell/zshrc`, `nvim/`, and `ghostty/`, then export its
+absolute path as `PROTOCOL_CONFIG_ROOT` before running the installer and
+`doctor`. The installer links all three live paths to that root while keeping
+agent instructions and skills linked to public protocol.
+
 ### 3. Neovim configuration
 
 Ask: "Do you want protocol's Neovim configuration as your global editor

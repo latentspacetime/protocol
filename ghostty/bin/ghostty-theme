@@ -22,8 +22,6 @@
 # Live preview covers palette, background, foreground, and cursor color;
 # selection colors have no portable OSC and land on config reload instead.
 #
-# Docs: Cortex/Runbooks/ghostty-theme-workflow.md
-
 set -u
 SELF="${0:A}"
 CONFIG="$HOME/.config/ghostty/config"

@@ -22,6 +22,17 @@ assert_contains() {
   (( assertions += 1 ))
 }
 
+assert_link() {
+  local path="$1" target="$2" label="$3"
+  if [[ ! -L "$path" || "${path:A}" != "${target:A}" ]]; then
+    print -u2 -- "FAIL $label"
+    print -u2 -- "  expected link: $path -> $target"
+    print -u2 -- "  actual: ${path:A}"
+    exit 1
+  fi
+  (( assertions += 1 ))
+}
+
 # The shell module targets interactive shells, where zsh hook arrays like
 # precmd_functions may legitimately be unset; suspend nounset while sourcing.
 export PROTOCOL_FRICTION_LOG="$sandbox/friction-log.md"
@@ -100,5 +111,30 @@ if (( $(grep -Fcx -- "AGENTS.md" "$sandbox_ignore") != 1 )); then
   exit 1
 fi
 (( assertions += 1 ))
+
+# A separate machine-specific config repository can own the live shell,
+# Neovim, and Ghostty paths while protocol continues to own portable tooling.
+overlay_home="$sandbox/overlay home"
+overlay_root="$sandbox/local config"
+mkdir -p "$overlay_home" "$overlay_root/nvim" "$overlay_root/ghostty" "$overlay_root/shell"
+print -r -- "source ${(q)root}/shell/protocol.zsh" > "$overlay_root/shell/zshrc"
+
+overlay_install_output=$(HOME="$overlay_home" ZDOTDIR="$overlay_home" \
+  XDG_CONFIG_HOME="$overlay_home/.config" PROTOCOL_CONFIG_ROOT="$overlay_root" \
+  "$root/install.zsh")
+assert_contains "$overlay_install_output" "protocol installed" "overlay installer succeeds"
+assert_link "$overlay_home/.zshrc" "$overlay_root/shell/zshrc" "overlay owns zshrc"
+assert_link "$overlay_home/.config/nvim" "$overlay_root/nvim" "overlay owns Neovim"
+assert_link "$overlay_home/.config/ghostty" "$overlay_root/ghostty" "overlay owns Ghostty"
+
+overlay_check_output=$(HOME="$overlay_home" ZDOTDIR="$overlay_home" \
+  XDG_CONFIG_HOME="$overlay_home/.config" PROTOCOL_CONFIG_ROOT="$overlay_root" \
+  "$root/install.zsh" --check)
+assert_contains "$overlay_check_output" "installation is valid" "overlay check succeeds"
+
+overlay_doctor_output=$(HOME="$overlay_home" ZDOTDIR="$overlay_home" \
+  XDG_CONFIG_HOME="$overlay_home/.config" PROTOCOL_CONFIG_ROOT="$overlay_root" \
+  "$root/scripts/doctor.zsh" 2>&1) || true
+assert_contains "$overlay_doctor_output" "installed links and shell integration" "doctor accepts overlay links"
 
 print "shell tests passed ($assertions assertions)"
