@@ -52,7 +52,9 @@ vim.opt.statusline = "%f %m %{v:lua.get_status_branch_string()} %= %l:%c %{%v:lu
 -- Ghostty instance identity. Each live nvim claims a slot via tabslot.lua,
 -- which gives it a stable NVIM N label shown in the terminal title. On
 -- FocusGained the tabline briefly becomes a full-width colored banner with
--- the label, so switching windows shows which instance you landed in.
+-- the label, so switching windows shows which instance you landed in, and
+-- the terminal title takes bracketed form for as long as this instance keeps
+-- focus, so the Ghostty tab bar always marks where you currently are.
 local tabslot = require("tabslot")
 
 local pulse_duration_ms = 350
@@ -63,22 +65,26 @@ local pulse_colors = { 14, 11, 10, 13, 12, 9 }
 local slot_dir = vim.fn.stdpath("state") .. "/tab-slots"
 local augroup = vim.api.nvim_create_augroup("Appearance", { clear = true })
 
-local tab_slot = tabslot.claim(slot_dir)
+local tab_slot, slot_identity = tabslot.claim(slot_dir)
 if not tab_slot then
     vim.notify("appearance: no instance slot claimed; NVIM number may repeat",
         vim.log.levels.WARN)
 end
-local instance_label = "NVIM " .. ((tab_slot or 0) + 1)
+local instance_number = (tab_slot or 0) + 1
+local instance_label = "NVIM " .. instance_number
+local focused_title = "[ " .. instance_label .. " ]"
 local pulse_active = false
 local pulse_generation = 0
 local pulse_banner = "%#InstancePulse#%= " .. instance_label .. " %="
 
+-- Launching into a Ghostty tab means you are looking at it, so the title
+-- starts bracketed; FocusLost strips the brackets the moment you leave.
 vim.opt.title = true
-vim.opt.titlestring = instance_label
+vim.opt.titlestring = focused_title
 vim.api.nvim_create_autocmd("VimLeavePre", {
     group = augroup,
     callback = function()
-        if tab_slot then tabslot.release(slot_dir, tab_slot) end
+        if tab_slot then tabslot.release(slot_dir, tab_slot, slot_identity) end
     end,
 })
 
@@ -89,15 +95,23 @@ vim.api.nvim_create_autocmd("FocusGained", {
         local generation = pulse_generation
 
         pulse_active = true
-        vim.opt.titlestring = "[ " .. instance_label .. " ]"
+        vim.opt.titlestring = focused_title
         vim.cmd("redrawtabline")
 
         vim.defer_fn(function()
             if generation ~= pulse_generation then return end
             pulse_active = false
-            vim.opt.titlestring = instance_label
             vim.cmd("redrawtabline")
         end, pulse_duration_ms)
+    end,
+})
+
+-- The banner is a one-shot flash, but the brackets are a standing focus
+-- marker: they come off only when another window takes over.
+vim.api.nvim_create_autocmd("FocusLost", {
+    group = augroup,
+    callback = function()
+        vim.opt.titlestring = instance_label
     end,
 })
 
@@ -107,9 +121,10 @@ vim.api.nvim_create_autocmd("FocusGained", {
 local tab_colors = { 9, 11, 10, 14, 12, 13 } -- red yellow green cyan blue magenta
 
 -- Tab 1 is always the CORE workspace and wears the instance color
--- (TabCoreSel/TabCore), a standing identity beyond the focus pulse; other
--- tabs show their file name and cycle tab_colors: selected renders as a
--- solid chip, the rest as colored text.
+-- (TabCoreSel/TabCore), a standing identity beyond the focus pulse. Its chip
+-- is numbered with the instance number rather than the tab index, so NVIM 2
+-- reads "2 CORE"; other tabs show their index and file name and cycle
+-- tab_colors: selected renders as a solid chip, the rest as colored text.
 function _G.my_tabline()
     if pulse_active then
         return pulse_banner
@@ -125,7 +140,7 @@ function _G.my_tabline()
             local group = is_selected and "TabRainbowSel" or "TabRainbow"
             s = s .. "%#" .. group .. color_index .. "#"
         end
-        s = s .. " " .. i .. " "
+        s = s .. " " .. (i == 1 and instance_number or i) .. " "
         if i == 1 then
             s = s .. "CORE"
         else

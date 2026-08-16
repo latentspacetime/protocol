@@ -55,16 +55,16 @@ check_platform() {
 
 check_neovim() {
   if ! command -v nvim >/dev/null 2>&1; then
-    report fail "nvim not found (editor configuration requires Neovim 0.9+)"
+    report fail "nvim not found (editor configuration requires Neovim 0.10+)"
     return
   fi
   local version_line
   version_line=$(nvim --version 2>/dev/null | head -1)
   if [[ "$version_line" =~ 'v([0-9]+)\.([0-9]+)' ]]; then
-    if (( match[1] > 0 || match[2] >= 9 )); then
-      report ok "nvim ${version_line#NVIM } (0.9+ required)"
+    if (( match[1] > 0 || match[2] >= 10 )); then
+      report ok "nvim ${version_line#NVIM } (0.10+ required)"
     else
-      report fail "nvim too old: $version_line (0.9+ required)"
+      report fail "nvim too old: $version_line (0.10+ required)"
     fi
   else
     report fail "could not parse nvim version from: $version_line"

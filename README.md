@@ -30,7 +30,7 @@ automation.
 - macOS
 - zsh
 - Git
-- Neovim 0.9 or newer
+- Neovim 0.10 or newer
 - ripgrep
 - Optional: fzf, zoxide, Claude Code, Codex, and OpenCode
 
@@ -124,14 +124,15 @@ check after running `install.zsh` on a new machine.
 ```zsh
 ./scripts/check.zsh
 ./tests/shell_test.zsh
+./tests/nvim_test.zsh
 doctor
 ```
 
 The check validates shell syntax, required files, executable scripts, broken
 links, accidental absolute home paths, credential-like files, task identifiers,
-and commit attribution trailers. The tests exercise the shell commands and
-doctor in an isolated temporary home. Both run in CI on every pull request;
-`doctor` validates the machine rather than the repository.
+and commit attribution trailers. The tests exercise the shell commands, doctor,
+and Neovim behavior in isolated temporary environments. All run in CI on every
+pull request; `doctor` validates the machine rather than the repository.
 
 ## License
 

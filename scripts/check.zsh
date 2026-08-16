@@ -12,6 +12,7 @@ required=(
   shell/protocol.zsh
   scripts/doctor.zsh
   tests/shell_test.zsh
+  tests/nvim_test.zsh
   ghostty/bin/ghostty-theme
   nvim/init.lua
   agent/AGENTS.md
@@ -26,7 +27,7 @@ for required_path in $required; do
   fi
 done
 
-for script in "$root/install.zsh" "$root/scripts/check.zsh" "$root/scripts/doctor.zsh" "$root/tests/shell_test.zsh" "$root/knowledge-vault/init.zsh" "$root/ghostty/bin/ghostty-theme"; do
+for script in "$root/install.zsh" "$root/scripts/check.zsh" "$root/scripts/doctor.zsh" "$root/tests/shell_test.zsh" "$root/tests/nvim_test.zsh" "$root/knowledge-vault/init.zsh" "$root/ghostty/bin/ghostty-theme"; do
   /bin/zsh -n "$script"
   if [[ ! -x "$script" ]]; then
     print -u2 "script is not executable: ${script#$root/}"
