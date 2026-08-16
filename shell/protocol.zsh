@@ -1,35 +1,77 @@
 # Portable interactive zsh configuration.
 
-typeset -g PROTOCOL_ROOT="${${(%):-%N}:A:h:h}"
+typeset -gx PROTOCOL_ROOT="${${(%):-%N}:A:h:h}"
 export CODE_WORKSPACE="${CODE_WORKSPACE:-$HOME/Code}"
 export PROTOCOL_FRICTION_LOG="${PROTOCOL_FRICTION_LOG:-${XDG_STATE_HOME:-$HOME/.local/state}/protocol/friction-log.md}"
+export PROTOCOL_REPO_COLOR_CONFIG="${PROTOCOL_REPO_COLOR_CONFIG:-$PROTOCOL_ROOT/shell/repo-colors.conf}"
 
 typeset -gA PROTOCOL_REPO_COLORS
 typeset -ga PROTOCOL_REPO_PALETTE=(131 71 67 133 173 179 98 109 144 174 103 72 137 110 180 139)
-typeset -gA _PROTOCOL_REPO_COLOR_CACHE
+typeset -gA _PROTOCOL_REPO_COLOR_CACHE=()
+
+protocol_load_repo_colors() {
+  typeset -A loaded_colors=()
+  if [[ ! -r "$PROTOCOL_REPO_COLOR_CONFIG" ]]; then
+    PROTOCOL_REPO_COLORS=()
+    return 0
+  fi
+  local repo color
+  while IFS='=' read -r repo color || [[ -n "$repo$color" ]]; do
+    [[ -z "$repo" || "$repo" == \#* ]] && continue
+    if [[ -z "$color" || "$color" != <-> || $color -lt 0 || $color -gt 255 ]]; then
+      print -u2 -- "invalid repository color in $PROTOCOL_REPO_COLOR_CONFIG: $repo=$color"
+      return 1
+    fi
+    loaded_colors[$repo]="$color"
+  done < "$PROTOCOL_REPO_COLOR_CONFIG"
+  PROTOCOL_REPO_COLORS=("${(@kv)loaded_colors}")
+}
+
+if [[ "$ZSH_EVAL_CONTEXT" == *file* ]]; then
+  protocol_load_repo_colors || :
+fi
+
+# Canonical repository-color resolver shared by the prompt and Neovim picker.
+# Sets REPLY to one Ghostty-compatible 256-color palette index.
+protocol_repo_color() {
+  local repo="$1"
+  if [[ -n "${PROTOCOL_REPO_COLORS[$repo]+x}" ]]; then
+    REPLY="${PROTOCOL_REPO_COLORS[$repo]}"
+  elif [[ -n "${_PROTOCOL_REPO_COLOR_CACHE[$repo]+x}" ]]; then
+    REPLY="${_PROTOCOL_REPO_COLOR_CACHE[$repo]}"
+  else
+    local hash
+    hash=$(echo -n "$repo" | cksum | awk '{print $1}')
+    REPLY="${PROTOCOL_REPO_PALETTE[$((hash % ${#PROTOCOL_REPO_PALETTE[@]} + 1))]}"
+    _PROTOCOL_REPO_COLOR_CACHE[$repo]="$REPLY"
+  fi
+}
+
+if [[ "$ZSH_EVAL_CONTEXT" != *file* && "${1:-}" == "--repo-colors" ]]; then
+  protocol_load_repo_colors || exit 1
+  shift
+  for _protocol_repo_name in "$@"; do
+    protocol_repo_color "$_protocol_repo_name"
+    print -r -- "$REPLY"
+  done
+  unset _protocol_repo_name
+  return 0 2>/dev/null || exit 0
+fi
 
 protocol_repo_prompt() {
+  protocol_load_repo_colors || return
   if [[ "$PWD" == "$CODE_WORKSPACE"/* ]]; then
     local repo="${PWD#$CODE_WORKSPACE/}"
     repo="${repo%%/*}"
-    local color
-    if [[ -n "${PROTOCOL_REPO_COLORS[$repo]+x}" ]]; then
-      color="${PROTOCOL_REPO_COLORS[$repo]}"
-    elif [[ -n "${_PROTOCOL_REPO_COLOR_CACHE[$repo]+x}" ]]; then
-      color="${_PROTOCOL_REPO_COLOR_CACHE[$repo]}"
-    else
-      local hash
-      hash=$(print -rn -- "$repo" | cksum | awk '{print $1}')
-      color="${PROTOCOL_REPO_PALETTE[$((hash % ${#PROTOCOL_REPO_PALETTE[@]} + 1))]}"
-      _PROTOCOL_REPO_COLOR_CACHE[$repo]="$color"
-    fi
+    protocol_repo_color "$repo"
+    local color="$REPLY"
     if [[ "$PWD" == "$CODE_WORKSPACE/$repo" ]]; then
       PS1="%F{$color}$repo%f %% "
     else
       PS1="%F{$color}$repo%f:%1~ %% "
     fi
   else
-    PS1="%1~ %% "
+    PS1="${PROTOCOL_PROMPT_FALLBACK:-%1~ %% }"
   fi
 }
 
@@ -105,6 +147,10 @@ wt() {
   [[ -z "$target" ]] && target=$(print -r -- "$porcelain" | awk -v name="$1" '
     /^worktree / { path=$2 }
     /^branch / { sub(/.*\//, "", $2); if (index($2, name) > 0) { print path; exit } }')
+  # Last resort: match the worktree directory path, for worktrees whose
+  # directory name carries the identity while the branch name does not.
+  [[ -z "$target" ]] && target=$(git worktree list 2>/dev/null | awk -v name="$1" '
+    $0 ~ name { print $1; exit }')
 
   if [[ -n "$target" ]]; then
     cd "$target"
@@ -182,7 +228,10 @@ alias gpo='git pull origin'
 alias oe='opencode --auto'
 alias sz='source ~/.zshrc'
 alias theme="$PROTOCOL_ROOT/ghostty/bin/ghostty-theme"
-alias doctor="$PROTOCOL_ROOT/scripts/doctor.zsh"
+# The doctor script lives in the protocol toolkit repository. When this module
+# is vendored into a separate live-configuration root, PROTOCOL_TOOLKIT_ROOT
+# names the toolkit checkout; by default the module's own repository has it.
+alias doctor="${PROTOCOL_TOOLKIT_ROOT:-$PROTOCOL_ROOT}/scripts/doctor.zsh"
 
 # if-guards, not &&-lists: a missing optional tool must not become a nonzero
 # exit status for this file, or sourcing it under errexit aborts the shell.

@@ -10,6 +10,9 @@ required=(
   SETUP.md
   install.zsh
   shell/protocol.zsh
+  shell/repo-colors.conf
+  git-hooks/dispatch.sh
+  git-hooks/README.md
   scripts/doctor.zsh
   tests/shell_test.zsh
   tests/nvim_test.zsh
@@ -36,6 +39,13 @@ for script in "$root/install.zsh" "$root/scripts/check.zsh" "$root/scripts/docto
 done
 
 /bin/zsh -n "$root/shell/protocol.zsh"
+
+# The hook dispatcher is bash (git invokes hooks via their shebang).
+bash -n "$root/git-hooks/dispatch.sh"
+if [[ ! -x "$root/git-hooks/dispatch.sh" ]]; then
+  print -u2 "script is not executable: git-hooks/dispatch.sh"
+  exit 1
+fi
 
 # The shell module must also *source* cleanly, with status 0, in a bare shell
 # running under errexit -- syntax checking alone missed a trailing &&-list

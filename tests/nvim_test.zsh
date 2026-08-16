@@ -14,6 +14,7 @@ print -r -- "source ${(q)root}/shell/protocol.zsh" > "$sandbox/home/.zshrc"
 export HOME="$sandbox/home"
 export XDG_STATE_HOME="$sandbox/state"
 export LUA_PATH="$root/nvim/lua/?.lua;;"
+export PROTOCOL_ROOT="$root"
 
 run_nvim_test() {
   local setup="$1" test_file="$2"
@@ -26,5 +27,6 @@ run_nvim_test 'require("recover"); require("keymaps")' recover_test.lua
 run_nvim_test 'require("otemp")' otemp_test.lua
 run_nvim_test 'require("friction")' friction_test.lua
 run_nvim_test 'require("appearance")' tabslot_test.lua
+run_nvim_test 'require("menus"); require("search")' repository_picker_test.lua
 
 print "nvim tests passed"
