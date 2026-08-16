@@ -1,6 +1,16 @@
 -- Embedded terminals and the CORE workspace layout (tree + T1–T4).
 local workspace = require("workspace")
 
+-- Expose the host terminal device so child processes (ghostty-theme) can
+-- send OSC sequences that bypass nvim's terminal emulator.
+if not vim.env.NVIM_HOST_TTY then
+    local ps_out = vim.fn.system("ps -o tty= -p " .. vim.fn.getpid())
+    local tty_name = vim.trim(ps_out)
+    if tty_name ~= "" and tty_name ~= "??" then
+        vim.env.NVIM_HOST_TTY = "/dev/" .. tty_name
+    end
+end
+
 -- Statusline renderer for terminal windows. Must stay on _G: each terminal
 -- window's statusline evaluates it through v:lua on redraw.
 function _G.my_term_status(winid, label)
