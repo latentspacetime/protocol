@@ -121,6 +121,7 @@ local function open_sync_terminal(label)
         vim.keymap.set('n', 'j', '<C-w>h', opts); vim.keymap.set('n', 'k', '<C-w>l', opts)
         vim.keymap.set('n', 'J', '<C-w>h', opts); vim.keymap.set('n', 'K', '<C-w>l', opts)
     end
+    require("search").attach_repository_picker(buf)
 end
 
 vim.api.nvim_create_autocmd({"BufEnter", "WinEnter", "TermOpen"}, {

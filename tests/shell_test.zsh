@@ -22,6 +22,17 @@ assert_contains() {
   (( assertions += 1 ))
 }
 
+assert_equal() {
+  local actual="$1" expected="$2" label="$3"
+  if [[ "$actual" != "$expected" ]]; then
+    print -u2 -- "FAIL $label"
+    print -u2 -- "  expected: $expected"
+    print -u2 -- "  actual: $actual"
+    exit 1
+  fi
+  (( assertions += 1 ))
+}
+
 assert_link() {
   local path="$1" target="$2" label="$3"
   if [[ ! -L "$path" || "${path:A}" != "${target:A}" ]]; then
@@ -36,9 +47,62 @@ assert_link() {
 # The shell module targets interactive shells, where zsh hook arrays like
 # precmd_functions may legitimately be unset; suspend nounset while sourcing.
 export PROTOCOL_FRICTION_LOG="$sandbox/friction-log.md"
+print -r -- "special-repo=68" > "$sandbox/repo-colors.conf"
+export PROTOCOL_REPO_COLOR_CONFIG="$sandbox/repo-colors.conf"
 set +u
 source "$root/shell/protocol.zsh"
 set -u
+
+# Repository colors: the prompt API and Neovim's batch command use the same
+# resolver, including environment-provided machine-local overrides.
+protocol_repo_color special-repo
+assert_equal "$REPLY" "68" "repo color resolver applies an override"
+protocol_repo_color ordinary-repo
+ordinary_repo_color="$REPLY"
+resolved_colors=("${(@f)$(/bin/zsh "$root/shell/protocol.zsh" --repo-colors special-repo ordinary-repo)}")
+assert_equal "$resolved_colors[1]" "68" "batch resolver applies the same override"
+assert_equal "$resolved_colors[2]" "$ordinary_repo_color" "batch and prompt colors stay identical"
+assert_equal "$PROTOCOL_ROOT" "$root" "protocol root is exported for Neovim"
+
+for legacy_repo in -n 'slash\cname'; do
+  legacy_hash=$(echo -n "$legacy_repo" | cksum | awk '{print $1}')
+  legacy_color="${PROTOCOL_REPO_PALETTE[$((legacy_hash % ${#PROTOCOL_REPO_PALETTE[@]} + 1))]}"
+  protocol_repo_color "$legacy_repo"
+  assert_equal "$REPLY" "$legacy_color" "resolver preserves legacy echo hash for $legacy_repo"
+done
+
+print -r -- $'special-repo=99\nbroken=invalid' > "$PROTOCOL_REPO_COLOR_CONFIG"
+reload_status=0
+protocol_load_repo_colors 2>/dev/null || reload_status=$?
+if (( reload_status == 0 )); then
+  print -u2 -- "FAIL malformed color reload exits nonzero"
+  exit 1
+fi
+(( assertions += 1 ))
+protocol_repo_color special-repo
+assert_equal "$REPLY" "68" "malformed reload preserves the last valid colors"
+print -r -- "special-repo=68" > "$PROTOCOL_REPO_COLOR_CONFIG"
+
+set -- --repo-colors should-remain
+source "$root/shell/protocol.zsh"
+assert_equal "$1" "--repo-colors" "sourcing does not consume caller positional arguments"
+assert_equal "$2" "should-remain" "sourcing completes instead of entering batch mode"
+set --
+
+# Outside the workspace the prompt uses a plain default PS1, which
+# PROTOCOL_PROMPT_FALLBACK replaces for machine-specific prompts.
+saved_workspace="$CODE_WORKSPACE"
+CODE_WORKSPACE="$sandbox/no-such-workspace"
+cd "$sandbox"
+protocol_repo_prompt
+assert_equal "$PS1" "%1~ %% " "prompt outside the workspace uses the plain default"
+PROTOCOL_PROMPT_FALLBACK="[test] %1~ %% "
+protocol_repo_prompt
+assert_equal "$PS1" "[test] %1~ %% " "PROTOCOL_PROMPT_FALLBACK overrides the fallback prompt"
+unset PROTOCOL_PROMPT_FALLBACK
+CODE_WORKSPACE="$saved_workspace"
+
+assert_equal "${aliases[doctor]}" "$root/scripts/doctor.zsh" "doctor alias defaults to the module's own toolkit"
 
 # ugh: first entry creates the log with a header and reports the count.
 output=$(cd "$sandbox" && ugh first annoyance)

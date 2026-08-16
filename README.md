@@ -20,6 +20,7 @@ automation.
 | `agent/` | Shared instructions, optional hooks, and reusable skills |
 | `knowledge-vault/` | Content-neutral vault bootstrap and conventions |
 | `pr-review/` | Secure design guidance for automated PR review systems |
+| `git-hooks/` | Global git hook dispatcher with agent-attribution stripping |
 | `install.zsh` | Non-destructive installer and link validator |
 | `scripts/check.zsh` | Repository validation and privacy checks |
 | `scripts/doctor.zsh` | Machine health report against the protocol baseline |
@@ -65,9 +66,13 @@ export PROTOCOL_CONFIG_ROOT="$HOME/Code/protocol-local"
 
 The external root must contain `shell/zshrc`, `nvim/`, and `ghostty/`. In this
 mode the installer links `~/.zshrc`, `~/.config/nvim`, and
-`~/.config/ghostty` to that root. The external `shell/zshrc` can source
-`protocol/shell/protocol.zsh` and add local values afterward. Keep the export
-available when running `doctor` so it validates the selected source.
+`~/.config/ghostty` to that root. The recommended arrangement is for the
+external root to carry its own copy of `shell/protocol.zsh` and for its
+`shell/zshrc` to source that copy, so live behavior has exactly one home and
+this repository serves as the portable source the copy is synced against.
+Export `PROTOCOL_TOOLKIT_ROOT` pointing at this repository's checkout so the
+`doctor` alias resolves, and keep `PROTOCOL_CONFIG_ROOT` exported when running
+`doctor` so it validates the selected source.
 
 Set the workspace root before sourcing the shell module when the default
 `$HOME/Code` is not appropriate:
@@ -75,6 +80,26 @@ Set the workspace root before sourcing the shell module when the default
 ```zsh
 export CODE_WORKSPACE="$HOME/path/to/code"
 ```
+
+## Neovim Workspace Picker
+
+From any CORE terminal pane, press `<Leader>r` (`Space+r` with the default
+Leader) to fuzzy-search the immediate folders under `CODE_WORKSPACE`. Press
+Tab to copy the selected absolute path, or Enter to send a shell-escaped `cd`
+command to the terminal pane that opened the picker. Use Enter while that pane
+is at a shell prompt. Every entry uses the same Ghostty 256-color assignment as
+the shell prompt. Explicit assignments live in `shell/repo-colors.conf`; the
+prompt and picker both call `protocol_repo_color`, so the palette, hash, and
+overrides have one owner.
+
+## Warp LLM Popup
+
+Inside Neovim, `<Leader>k` opens a small floating window for a quick LLM
+query. Type a question and press Enter; the response streams in below a
+divider with markdown rendering. Press `s` to cycle models, `m` for the menu,
+and `b` to copy a code block from the response. Requests go to OpenRouter and
+authenticate with the `OPENROUTER_API_KEY` environment variable; without the
+key the popup reports that and sends nothing.
 
 ## Agent-Guided Setup
 
