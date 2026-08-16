@@ -18,3 +18,5 @@ jobs:
         run: ./scripts/check.zsh
       - name: Shell behavior tests
         run: ./tests/shell_test.zsh
+      - name: Neovim behavior tests
+        run: ./tests/nvim_test.zsh
