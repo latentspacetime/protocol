@@ -51,6 +51,24 @@ files stay untracked by default; tracking one becomes a deliberate
 to replace regular files or unrelated links. Existing configuration must be
 reviewed and moved manually before installation.
 
+### Separate Live Configuration
+
+Users who keep machine-specific shell, Neovim, and Ghostty files in a separate
+repository can point the installer at that source while protocol continues to
+own portable agent instructions, skills, and tooling:
+
+```zsh
+export PROTOCOL_CONFIG_ROOT="$HOME/Code/protocol-local"
+./install.zsh
+./install.zsh --check
+```
+
+The external root must contain `shell/zshrc`, `nvim/`, and `ghostty/`. In this
+mode the installer links `~/.zshrc`, `~/.config/nvim`, and
+`~/.config/ghostty` to that root. The external `shell/zshrc` can source
+`protocol/shell/protocol.zsh` and add local values afterward. Keep the export
+available when running `doctor` so it validates the selected source.
+
 Set the workspace root before sourcing the shell module when the default
 `$HOME/Code` is not appropriate:
 
@@ -110,7 +128,9 @@ check after running `install.zsh` on a new machine.
 
 ## Safety Model
 
-- Secrets and local overrides stay in untracked local files.
+- Secrets stay outside version control. Local overrides may live in a separate
+  private configuration repository, with reusable changes sanitized and
+  contributed through a branch.
 - Install operations are idempotent and fail on conflicts.
 - Agent instructions remain generic; repository-local instructions take
   precedence for project-specific behavior.
