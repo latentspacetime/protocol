@@ -91,9 +91,11 @@ keeping official `opencode` available as a fallback?"
 
 If yes, install Bun 1.3 or newer, clone the user's Protocode fork beside this
 repository, configure `anomalyco/opencode` as its `upstream` remote, and check
-out its `stable` branch. Run `install.zsh` to install the static wrapper, then
-follow the build and release-tag procedure in `README.md`. Verify that `oe
---version` uses the pinned build and `opencode --version` still uses the
+out its `stable` branch. That branch is where the personal `protocode:`
+commits live, on top of a pinned upstream tag; Protocol only records which
+of those commits was built. Run `install.zsh` to install the static wrapper,
+then follow the build and release-tag procedure in `README.md`. Verify that
+`oe --version` uses the pinned build and `opencode --version` still uses the
 official installation.
 
 If no, the installed wrapper remains dormant and `doctor` reports Protocode as

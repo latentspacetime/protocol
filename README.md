@@ -138,9 +138,16 @@ Sourcing `shell/protocol.zsh` provides:
 
 ## Protocode
 
-Protocode is a standalone OpenCode fork maintained as a linear patch series on
-stable upstream tags. Official `opencode` remains an independent fallback;
-`oe` calls `~/.local/bin/protocode`, which runs the build selected by
+Protocode is a standalone OpenCode fork. Personal changes live in that
+fork on the `stable` branch, as a linear series of `protocode:` commits
+on top of a pinned upstream release tag. `git log <upstream-tag>..stable`
+prints the complete series. `PROTOCODE.md` at the fork root lists each
+divergence and its upstream status. Protocol does not carry those
+commits; `protocode.pin` records which `stable` commit was built and
+installed.
+
+Official `opencode` remains an independent fallback. `oe` calls
+`~/.local/bin/protocode`, which runs the build selected by
 `~/.local/share/protocode/current`.
 
 Clone the fork beside Protocol and configure the community remote:
@@ -150,8 +157,12 @@ git clone https://github.com/your-user/protocode.git "$CODE_WORKSPACE/protocode"
 git -C "$CODE_WORKSPACE/protocode" remote add upstream https://github.com/anomalyco/opencode.git
 ```
 
-The source must be on a clean `stable` branch with exactly one release tag at
-its current commit. Build and activate it with:
+Author new work on `feature/*` from `stable`, prefix finished commits
+with `protocode:`, update the ledger, and fast-forward `stable`. The
+source must be on a clean `stable` branch with exactly one
+`protocode-<version>-r<N>` release tag at `HEAD`. The build compiles
+that `HEAD`, which already includes the personal series. Build and
+activate it with:
 
 ```zsh
 git -C "$CODE_WORKSPACE/protocode" tag protocode-<version>-r<N> stable
