@@ -1,8 +1,8 @@
 # Protocol
 
 Protocol is a portable development-environment toolkit for macOS. It keeps
-shell shortcuts, Neovim configuration, coding-agent instructions, reusable
-skills, a verified Protocode build pipeline, knowledge-vault conventions, and
+shell shortcuts, Neovim configuration, coding-agent instructions, the
+screenshot skill, a verified Protocode build pipeline, knowledge-vault conventions, and
 pull-request review practices in one versioned repository.
 
 The repository contains configuration only. It does not contain credentials,
@@ -63,7 +63,7 @@ reviewed and moved manually before installation.
 
 Users who keep machine-specific shell, Neovim, and Ghostty files in a separate
 repository can point the installer at that source while protocol continues to
-own portable agent instructions, skills, and tooling:
+own portable agent instructions, the screenshot skill, and tooling:
 
 ```zsh
 export PROTOCOL_CONFIG_ROOT="$HOME/Code/protocol-local"
@@ -145,83 +145,6 @@ Sourcing `shell/protocol.zsh` provides:
 | `claude` / `codex` / `ci` | Coding-agent launchers with session color and shorthand flags |
 | `oe [args]` | Launch the active verified Protocode build with `--auto` and forward all arguments |
 
-## Protocode
-
-Protocode is a standalone OpenCode fork. Personal changes live in that
-fork on the `stable` branch, as a linear series of `protocode:` commits
-on top of a pinned upstream release tag. `git log <upstream-tag>..stable`
-prints the complete series. `PROTOCODE.md` at the fork root lists each
-divergence and its upstream status. Protocol does not carry those
-commits; `protocode.pin` records which `stable` commit was built and
-installed.
-
-Official `opencode` remains an independent fallback. `oe` calls
-`~/.local/bin/protocode`, which runs the build selected by
-`~/.local/share/protocode/current`.
-
-Clone the fork beside Protocol and configure the community remote:
-
-```zsh
-git clone https://github.com/your-user/protocode.git "$CODE_WORKSPACE/protocode"
-git -C "$CODE_WORKSPACE/protocode" remote add upstream https://github.com/anomalyco/opencode.git
-```
-
-Author new work on `feature/*` from `stable`, prefix finished commits
-with `protocode:`, update the ledger, and fast-forward `stable`. The
-source must be on a clean `stable` branch with exactly one
-`protocode-<version>-r<N>` release tag at `HEAD`. The build compiles
-that `HEAD`, which already includes the personal series. Build and
-activate it with:
-
-```zsh
-git -C "$CODE_WORKSPACE/protocode" tag protocode-<version>-r<N> stable
-PROTOCODE_SOURCE_ROOT="$CODE_WORKSPACE/protocode" ./scripts/protocode-build.zsh
-```
-
-The build script fetches the selected release tag from the validated upstream
-remote into a provenance ref before it executes repository code. It then
-installs the frozen dependency graph, runs root lint and type checks, runs the
-TUI and OpenCode package suites, compiles the native binary, and smoke-tests
-both the build output and staged copy. The promotion state machine records the
-upstream commit in `protocode.pin`, installs the binary under
-`~/.local/share/protocode/builds/<commit>`, and atomically repoints `current`.
-An interruption at any promotion boundary restores the prior pin and active
-link and removes the uncommitted target. Builds are serialized, and an existing
-commit directory is reused only when its digest matches the trusted pin for
-that commit. This accommodates nondeterministic native output without replacing
-a previously verified artifact. The three newest verified builds are retained;
-cleanup failures are reported as warnings after a successful activation.
-
-The wrapper disables Protocode auto-update and gives it separate XDG data,
-state, and cache roots. `XDG_CONFIG_HOME` remains unchanged so Protocode and
-official OpenCode share configuration, instructions, skills, providers, and
-themes. Override the defaults with `PROTOCODE_DATA_HOME`,
-`PROTOCODE_STATE_HOME`, and `PROTOCODE_CACHE_HOME`.
-
-To absorb a selected stable release:
-
-```zsh
-git -C "$CODE_WORKSPACE/protocode" fetch upstream --tags
-git -C "$CODE_WORKSPACE/protocode" tag protocode-<old-version>-r<N> stable
-git -C "$CODE_WORKSPACE/protocode" rebase --onto <new-stable-tag> <old-stable-tag> stable
-```
-
-Resolve conflicts deliberately, remove patches already shipped upstream,
-update `PROTOCODE.md`, create the new release tag, and rerun the complete build
-pipeline. Skipping upstream releases is expected.
-
-To exercise or perform rollback, select a retained commit and then restore the
-pinned release after verification:
-
-```zsh
-ln -sfn "builds/<retained-commit>" "$HOME/.local/share/protocode/current"
-protocode --version
-ln -sfn "builds/$(grep '^COMMIT=' protocode.pin | cut -d= -f2)" "$HOME/.local/share/protocode/current"
-```
-
-`doctor` reports a pin mismatch while a previous build is selected, making a
-temporary rollback visible.
-
 ## Friction Log
 
 Workflow improvements should start from evidence, not recall. The moment
@@ -251,18 +174,6 @@ optional when no source or build exists; a partial or inconsistent setup is a
 failure. `doctor` exits nonzero when anything required is missing, so it also
 serves as an acceptance check after installation.
 
-## Safety Model
-
-- Secrets stay outside version control. Local overrides may live in a separate
-  private configuration repository, with reusable changes sanitized and
-  contributed through a branch.
-- Install operations are idempotent and fail on conflicts.
-- Agent instructions remain generic; repository-local instructions take
-  precedence for project-specific behavior.
-- Automated reviewers are read-only by default. Any fixer must separate an
-  uncredentialed model job from the credentialed job that applies a reviewed
-  patch.
-- Knowledge-vault content remains outside this repository.
 
 ## Validate
 
