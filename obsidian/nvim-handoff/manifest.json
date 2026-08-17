@@ -1,0 +1,9 @@
+{
+  "id": "nvim-handoff",
+  "name": "Nvim Handoff",
+  "version": "0.2.0",
+  "minAppVersion": "1.5.0",
+  "description": "Opens a note with graph view in a right split when invoked from nvim via obsidian://nvim.",
+  "author": "protocol",
+  "isDesktopOnly": true
+}

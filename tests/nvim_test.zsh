@@ -28,5 +28,6 @@ run_nvim_test 'require("otemp")' otemp_test.lua
 run_nvim_test 'require("friction")' friction_test.lua
 run_nvim_test 'require("appearance")' tabslot_test.lua
 run_nvim_test 'require("menus"); require("search")' repository_picker_test.lua
+run_nvim_test 'require("obsidian")' obsidian_test.lua
 
 print "nvim tests passed"
