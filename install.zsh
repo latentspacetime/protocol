@@ -43,6 +43,38 @@ ensure_link() {
   ln -s "$source_path" "$target_path"
 }
 
+ensure_static_file() {
+  local source_path="$1"
+  local target_path="$2"
+  local temporary_path="${target_path}.tmp.$$"
+
+  if [[ ! -f "$source_path" || ! -x "$source_path" ]]; then
+    print -u2 "missing executable source: $source_path"
+    return 1
+  fi
+  if [[ -f "$target_path" ]] && cmp -s "$source_path" "$target_path" && [[ -x "$target_path" ]]; then
+    return
+  fi
+  if [[ "$mode" == "--check" ]]; then
+    print -u2 "outdated or invalid installed file: $target_path"
+    return 1
+  fi
+  if [[ -e "$target_path" || -L "$target_path" ]]; then
+    if [[ ! -f "$target_path" ]] || ! grep -Fqx '# protocol-managed-protocode-wrapper' "$target_path" 2>/dev/null; then
+      print -u2 "refusing to replace existing path: $target_path"
+      return 1
+    fi
+  fi
+
+  mkdir -p "${target_path:h}"
+  if ! cp "$source_path" "$temporary_path" ||
+     ! chmod 755 "$temporary_path" ||
+     ! mv -f "$temporary_path" "$target_path"; then
+    rm -f "$temporary_path"
+    return 1
+  fi
+}
+
 ensure_shell_source() {
   local zshrc="$HOME/.zshrc"
 
@@ -107,11 +139,22 @@ ensure_shell_configuration
 ensure_git_ignore
 ensure_link "$config_root/nvim" "$HOME/.config/nvim"
 ensure_link "$config_root/ghostty" "$HOME/.config/ghostty"
-ensure_link "$protocol_root/agent/AGENTS.md" "$HOME/.claude/CLAUDE.md"
-ensure_link "$protocol_root/agent/AGENTS.md" "$HOME/.codex/AGENTS.md"
-ensure_link "$protocol_root/agent/AGENTS.md" "$HOME/.config/opencode/AGENTS.md"
+agent_instructions="${PROTOCOL_AGENT_INSTRUCTIONS:-$protocol_root/agent/AGENTS.md}"
+ensure_link "$agent_instructions" "$HOME/.claude/CLAUDE.md"
+ensure_link "$agent_instructions" "$HOME/.codex/AGENTS.md"
+ensure_link "$agent_instructions" "$HOME/.config/opencode/AGENTS.md"
+wrapper_source="$protocol_root/bin/protocode"
+if [[ "$config_root" != "$protocol_root" ]]; then
+  wrapper_source="$config_root/shell/protocode"
+fi
+ensure_static_file "$wrapper_source" "$HOME/.local/bin/protocode"
 
-for skill in "$protocol_root"/agent/skills/*(/N); do
+skills_root="${PROTOCOL_SKILLS_ROOT:-$protocol_root/agent/skills}"
+if [[ ! -d "$skills_root" ]]; then
+  print -u2 "skills source missing: $skills_root"
+  exit 1
+fi
+for skill in "$skills_root"/*(/N); do
   [[ -f "$skill/SKILL.md" ]] || continue
   ensure_link "$skill" "$HOME/.claude/skills/${skill:t}"
   ensure_link "$skill" "$HOME/.agents/skills/${skill:t}"
