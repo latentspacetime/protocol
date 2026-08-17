@@ -1,8 +1,8 @@
 # Protocol
 
 Protocol is a portable development-environment toolkit for macOS. It keeps
-shell shortcuts, Neovim configuration, coding-agent instructions, reusable
-skills, a verified Protocode build pipeline, knowledge-vault conventions, and
+shell shortcuts, Neovim configuration, coding-agent instructions, the
+screenshot skill, a verified Protocode build pipeline, knowledge-vault conventions, and
 pull-request review practices in one versioned repository.
 
 The repository contains configuration only. It does not contain credentials,
@@ -17,7 +17,7 @@ automation.
 | `shell/protocol.zsh` | Shell prompt, command wrappers, and shortcuts |
 | `ghostty/` | Terminal defaults and live theme picker |
 | `nvim/` | Neovim configuration and pinned plugin versions |
-| `agent/` | Shared instructions, optional hooks, and reusable skills |
+| `agent/` | Shared instructions, optional hooks, and the screenshot skill |
 | `knowledge-vault/` | Content-neutral vault bootstrap and conventions |
 | `pr-review/` | Secure design guidance for automated PR review systems |
 | `git-hooks/` | Global git hook dispatcher with agent-attribution stripping |
@@ -62,7 +62,7 @@ reviewed and moved manually before installation.
 
 Users who keep machine-specific shell, Neovim, and Ghostty files in a separate
 repository can point the installer at that source while protocol continues to
-own portable agent instructions, skills, and tooling:
+own portable agent instructions, the screenshot skill, and tooling:
 
 ```zsh
 export PROTOCOL_CONFIG_ROOT="$HOME/Code/protocol-local"
