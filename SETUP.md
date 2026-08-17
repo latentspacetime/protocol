@@ -53,7 +53,7 @@ Default: protocol owns the live paths. If the user chooses a separate source,
 verify that it contains `shell/zshrc`, `nvim/`, and `ghostty/`, then export its
 absolute path as `PROTOCOL_CONFIG_ROOT` before running the installer and
 `doctor`. The installer links all three live paths to that root while keeping
-agent instructions and skills linked to public protocol.
+agent instructions and the screenshot skill linked to public protocol.
 
 ### 3. Neovim configuration
 
@@ -79,7 +79,7 @@ skipped, never replaced.
 
 Ask: "Which coding agents do you use: Claude Code, Codex, OpenCode?"
 
-The installer links the shared instructions and skills for all three; links
+The installer links the shared instructions and the screenshot skill for all three; links
 for harnesses that are not installed are harmless and become active if that
 harness is added later. Note the answer so verification in step 8 checks the
 harnesses the user actually runs.
@@ -187,7 +187,7 @@ user made.
   --version` remains available, and `doctor` confirms the source, pin, wrapper,
   and active build agree.
 - Each harness from question 5 loads the shared instructions and lists the
-  shared skills in a fresh session.
+  screenshot skill in a fresh session.
 - If Neovim was adopted: `nvim` opens the workspace layout, and `:Rg` finds
   text across the workspace.
 
