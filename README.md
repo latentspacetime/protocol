@@ -17,7 +17,8 @@ automation.
 | `shell/protocol.zsh` | Shell prompt, command wrappers, and shortcuts |
 | `ghostty/` | Terminal defaults and live theme picker |
 | `nvim/` | Neovim configuration and pinned plugin versions |
-| `agent/` | Shared instructions, optional hooks, and the screenshot skill |
+| `agent/` | Shared instructions, optional hooks, and reusable skills |
+| `obsidian/` | Optional vault plugin so `:oo` opens a note beside graph view |
 | `knowledge-vault/` | Content-neutral vault bootstrap and conventions |
 | `pr-review/` | Secure design guidance for automated PR review systems |
 | `git-hooks/` | Global git hook dispatcher with agent-attribution stripping |
@@ -90,7 +91,15 @@ Set the workspace root before sourcing the shell module when the default
 
 ```zsh
 export CODE_WORKSPACE="$HOME/path/to/code"
+export PROTOCOL_VAULT="$HOME/Notes"
 ```
+
+## Obsidian Handoff
+
+`:oo` in Neovim writes the current buffer if needed and opens it in the
+Obsidian app. Install `obsidian/nvim-handoff/` in the vault to place the note
+beside graph view and keep that note selected. `:o` remains native `:edit`.
+Point `PROTOCOL_VAULT` at the vault directory; the default is `$HOME/Notes`.
 
 ## Neovim Workspace Picker
 
