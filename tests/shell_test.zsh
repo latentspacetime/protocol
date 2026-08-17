@@ -118,6 +118,81 @@ protocol_repo_color special-repo
 assert_equal "$REPLY" "68" "malformed reload preserves the last valid colors"
 print -r -- "special-repo=68" > "$PROTOCOL_REPO_COLOR_CONFIG"
 
+# Claude session helpers: symlink cwd keys match realpath, and /color stubs
+# are deleted without touching titled or real-prompt transcripts.
+claude_sandbox="$sandbox/claude-sessions"
+mkdir -p "$claude_sandbox/real/dir"
+ln -s "$claude_sandbox/real/dir" "$claude_sandbox/link"
+saved_claude_config="${CLAUDE_CONFIG_DIR-}"
+export CLAUDE_CONFIG_DIR="$claude_sandbox/config"
+assert_equal "$(protocol_claude_project_key "$claude_sandbox/link")" \
+  "$(protocol_claude_project_key "$claude_sandbox/real/dir")" \
+  "claude project key follows realpath through a symlink"
+sid="11111111-1111-1111-1111-111111111111"
+assert_equal "$(protocol_claude_session_path "$sid" "$claude_sandbox/link")" \
+  "$CLAUDE_CONFIG_DIR/projects/$(protocol_claude_project_key "$claude_sandbox/real/dir")/${sid}.jsonl" \
+  "claude session path uses the canonical project key"
+
+stub="$claude_sandbox/stub.jsonl"
+print -r -- '{"type":"agent-color","agentColor":"red","sessionId":"x"}' > "$stub"
+print -r -- '{"type":"user","message":{"content":"<command-name>/color</command-name>"},"isMeta":false}' >> "$stub"
+if protocol_claude_session_is_stub "$stub"; then
+  (( assertions += 1 ))
+else
+  print -u2 -- "FAIL color-only transcript is a stub"
+  exit 1
+fi
+
+titled="$claude_sandbox/titled.jsonl"
+print -r -- '{"type":"agent-color","agentColor":"red","sessionId":"x"}' > "$titled"
+print -r -- '{"type":"custom-title","customTitle":"Real work"}' >> "$titled"
+if protocol_claude_session_is_stub "$titled"; then
+  print -u2 -- "FAIL titled transcript is not a stub"
+  exit 1
+fi
+(( assertions += 1 ))
+
+real_prompt="$claude_sandbox/real.jsonl"
+print -r -- '{"type":"agent-color","agentColor":"red","sessionId":"x"}' > "$real_prompt"
+print -r -- '{"type":"user","message":{"content":"please fix resume"}}' >> "$real_prompt"
+if protocol_claude_session_is_stub "$real_prompt"; then
+  print -u2 -- "FAIL real-prompt transcript is not a stub"
+  exit 1
+fi
+(( assertions += 1 ))
+
+protocol_reap_claude_color_stub "$stub"
+protocol_reap_claude_color_stub "$titled"
+protocol_reap_claude_color_stub "$real_prompt"
+assert_absent "$stub" "color stub is deleted"
+if [[ ! -f "$titled" ]]; then
+  print -u2 -- "FAIL titled transcript was deleted"
+  exit 1
+fi
+(( assertions += 1 ))
+if [[ ! -f "$real_prompt" ]]; then
+  print -u2 -- "FAIL real-prompt transcript was deleted"
+  exit 1
+fi
+(( assertions += 1 ))
+
+mkdir -p "$CLAUDE_CONFIG_DIR/projects/proj"
+cp "$real_prompt" "$CLAUDE_CONFIG_DIR/projects/proj/keep.jsonl"
+print -r -- '{"type":"agent-color","agentColor":"blue","sessionId":"y"}' > "$CLAUDE_CONFIG_DIR/projects/proj/drop.jsonl"
+print -r -- '{"type":"user","message":{"content":"<command-name>/color</command-name>"}}' >> "$CLAUDE_CONFIG_DIR/projects/proj/drop.jsonl"
+protocol_reap_claude_color_stubs
+assert_absent "$CLAUDE_CONFIG_DIR/projects/proj/drop.jsonl" "bulk reaper deletes color stubs"
+if [[ ! -f "$CLAUDE_CONFIG_DIR/projects/proj/keep.jsonl" ]]; then
+  print -u2 -- "FAIL bulk reaper deleted a real transcript"
+  exit 1
+fi
+(( assertions += 1 ))
+if [[ -n "$saved_claude_config" ]]; then
+  export CLAUDE_CONFIG_DIR="$saved_claude_config"
+else
+  unset CLAUDE_CONFIG_DIR
+fi
+
 set -- --repo-colors should-remain
 source "$root/shell/protocol.zsh"
 assert_equal "$1" "--repo-colors" "sourcing does not consume caller positional arguments"

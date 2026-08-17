@@ -83,11 +83,76 @@ protocol_random_color() {
   print -r -- "${colors[$((RANDOM % ${#colors[@]} + 1))]}"
 }
 
+# Claude Code writes transcripts under the logical cwd and looks them up
+# with realpath. Launching from a symlink (workspace doc route, ~/.config/nvim)
+# therefore stores a session that later --resume cannot see.
+protocol_claude_project_key() {
+  print -r -- "${${${1:-$PWD}:A}//[^a-zA-Z0-9]/-}"
+}
+
+protocol_claude_session_path() {
+  local session_id="$1"
+  local dir="${2:-$PWD}"
+  local root="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  print -r -- "$root/projects/$(protocol_claude_project_key "$dir")/${session_id}.jsonl"
+}
+
+protocol_claude_session_is_stub() {
+  local file="$1" line contents
+  [[ -f "$file" ]] || return 1
+  contents="$(<"$file")"
+  [[ "$contents" == *'"type":"agent-color"'* || "$contents" == *'"type": "agent-color"'* ]] || return 1
+  [[ "$contents" == *'"customTitle":"'* || "$contents" == *'"aiTitle":"'* ]] && return 1
+  while IFS= read -r line; do
+    if [[ "$line" != *'"type":"user"'* && "$line" != *'"type": "user"'* ]]; then
+      continue
+    fi
+    if [[ "$line" == *'<command-name>'* || "$line" == *'<local-command-stdout>'* ]]; then
+      continue
+    fi
+    if [[ "$line" == *'"isMeta":true'* || "$line" == *'"isMeta": true'* ]]; then
+      continue
+    fi
+    return 1
+  done < "$file"
+  return 0
+}
+
+protocol_reap_claude_color_stub() {
+  local file="$1"
+  protocol_claude_session_is_stub "$file" || return 0
+  /bin/rm -f "$file"
+}
+
+protocol_reap_claude_color_stubs() {
+  local projects="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
+  local file
+  [[ -d "$projects" ]] || return 0
+  for file in "$projects"/*/*.jsonl(N); do
+    protocol_reap_claude_color_stub "$file"
+  done
+}
+
+protocol_claude_in_canonical_dir() {
+  local launch_dir="${PWD:A}"
+  (
+    cd "$launch_dir" || exit
+    "$@"
+  )
+}
+
 protocol_start_claude() {
   local session_id="${$(uuidgen):l}"
   local color="$(protocol_random_color)"
-  command claude -p --session-id "$session_id" "/color $color" >/dev/null || return
-  command claude --resume "$session_id" "$@"
+  local launch_dir="${PWD:A}"
+  (
+    cd "$launch_dir" || exit
+    command claude -p --session-id "$session_id" "/color $color" >/dev/null || exit
+    command claude --resume "$session_id" "$@"
+    local rc=$?
+    protocol_reap_claude_color_stub "$(protocol_claude_session_path "$session_id" "$launch_dir")"
+    exit $rc
+  )
 }
 
 claude() {
@@ -104,7 +169,7 @@ claude() {
     protocol_start_claude
     return
   fi
-  command claude "${args[@]}"
+  protocol_claude_in_canonical_dir command claude "${args[@]}"
 }
 
 codex() {
