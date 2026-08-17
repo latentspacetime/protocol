@@ -225,7 +225,16 @@ ugh() {
 }
 
 alias gpo='git pull origin'
-alias oe='opencode --auto'
+unalias oe 2>/dev/null || true
+oe() {
+  local launcher="${PROTOCODE_BIN:-$HOME/.local/bin/protocode}"
+  if [[ ! -x "$launcher" ]]; then
+    print -u2 -- "protocode launcher missing: $launcher"
+    print -u2 -- "Run: ${PROTOCOL_TOOLKIT_ROOT:-${CODE_WORKSPACE:-$HOME/Code}/protocol}/install.zsh"
+    return 1
+  fi
+  "$launcher" --auto "$@"
+}
 alias sz='source ~/.zshrc'
 alias theme="$PROTOCOL_ROOT/ghostty/bin/ghostty-theme"
 # The doctor script lives in the protocol toolkit repository. When this module

@@ -2,8 +2,8 @@
 
 Protocol is a portable development-environment toolkit for macOS. It keeps
 shell shortcuts, Neovim configuration, coding-agent instructions, reusable
-skills, knowledge-vault conventions, and pull-request review practices in one
-versioned repository.
+skills, a verified Protocode build pipeline, knowledge-vault conventions, and
+pull-request review practices in one versioned repository.
 
 The repository contains configuration only. It does not contain credentials,
 machine-specific paths, private notes, project names, or organization-specific
@@ -22,8 +22,12 @@ automation.
 | `pr-review/` | Secure design guidance for automated PR review systems |
 | `git-hooks/` | Global git hook dispatcher with agent-attribution stripping |
 | `install.zsh` | Non-destructive installer and link validator |
+| `bin/protocode` | Static launcher for the active verified Protocode build |
 | `scripts/check.zsh` | Repository validation and privacy checks |
 | `scripts/doctor.zsh` | Machine health report against the protocol baseline |
+| `scripts/protocode-build.zsh` | Verified native build, atomic activation, pin, and retention pipeline |
+| `scripts/protocode-promote.zsh` | Internal failure-recoverable artifact promotion state machine |
+| `protocode.pin` | Upstream tag/commit provenance, Protocode release tag, source commit, and installed artifact digest |
 | `tests/` | Behavior tests for shell commands and doctor |
 
 ## Requirements
@@ -33,7 +37,8 @@ automation.
 - Git
 - Neovim 0.10 or newer
 - ripgrep
-- Optional: fzf, zoxide, Claude Code, Codex, and OpenCode
+- Bun 1.3 or newer when using Protocode
+- Optional: fzf, zoxide, Claude Code, Codex, and official OpenCode
 
 ## Install
 
@@ -44,8 +49,9 @@ Clone the repository anywhere, then run:
 ./install.zsh --check
 ```
 
-The installer is deliberately non-destructive. It creates missing links, adds
-one marked source block to `~/.zshrc`, and appends `AGENTS.md`, `CLAUDE.md`,
+The installer is deliberately non-destructive. It creates missing links,
+installs the static Protocode wrapper, adds one marked source block to
+`~/.zshrc`, and appends `AGENTS.md`, `CLAUDE.md`,
 and `.claude/` to the global git ignore so repository-level agent instruction
 files stay untracked by default; tracking one becomes a deliberate
 `git add -f`, and files a repository already tracks are unaffected. It refuses
@@ -73,6 +79,11 @@ this repository serves as the portable source the copy is synced against.
 Export `PROTOCOL_TOOLKIT_ROOT` pointing at this repository's checkout so the
 `doctor` alias resolves, and keep `PROTOCOL_CONFIG_ROOT` exported when running
 `doctor` so it validates the selected source.
+
+Set `PROTOCOL_AGENT_INSTRUCTIONS` or `PROTOCOL_SKILLS_ROOT` before running the
+installer when another repository owns the canonical harness instructions or
+skills. The installer validates those selected sources instead of requiring
+the copies in this repository.
 
 Set the workspace root before sourcing the shell module when the default
 `$HOME/Code` is not appropriate:
@@ -122,7 +133,74 @@ Sourcing `shell/protocol.zsh` provides:
 | `ugh [message]` | Append a timestamped entry to the friction log; without a message, show recent entries |
 | `doctor` | Report machine health against the protocol baseline |
 | `theme` | Live Ghostty theme picker |
-| `claude` / `codex` / `ci` / `oe` | Coding-agent launchers with session color and shorthand flags |
+| `claude` / `codex` / `ci` | Coding-agent launchers with session color and shorthand flags |
+| `oe [args]` | Launch the active verified Protocode build with `--auto` and forward all arguments |
+
+## Protocode
+
+Protocode is a standalone OpenCode fork maintained as a linear patch series on
+stable upstream tags. Official `opencode` remains an independent fallback;
+`oe` calls `~/.local/bin/protocode`, which runs the build selected by
+`~/.local/share/protocode/current`.
+
+Clone the fork beside Protocol and configure the community remote:
+
+```zsh
+git clone https://github.com/your-user/protocode.git "$CODE_WORKSPACE/protocode"
+git -C "$CODE_WORKSPACE/protocode" remote add upstream https://github.com/anomalyco/opencode.git
+```
+
+The source must be on a clean `stable` branch with exactly one release tag at
+its current commit. Build and activate it with:
+
+```zsh
+git -C "$CODE_WORKSPACE/protocode" tag protocode-<version>-r<N> stable
+PROTOCODE_SOURCE_ROOT="$CODE_WORKSPACE/protocode" ./scripts/protocode-build.zsh
+```
+
+The build script fetches the selected release tag from the validated upstream
+remote into a provenance ref before it executes repository code. It then
+installs the frozen dependency graph, runs root lint and type checks, runs the
+TUI and OpenCode package suites, compiles the native binary, and smoke-tests
+both the build output and staged copy. The promotion state machine records the
+upstream commit in `protocode.pin`, installs the binary under
+`~/.local/share/protocode/builds/<commit>`, and atomically repoints `current`.
+An interruption at any promotion boundary restores the prior pin and active
+link and removes the uncommitted target. Builds are serialized, and an existing
+commit directory is reused only when its digest matches the trusted pin for
+that commit. This accommodates nondeterministic native output without replacing
+a previously verified artifact. The three newest verified builds are retained;
+cleanup failures are reported as warnings after a successful activation.
+
+The wrapper disables Protocode auto-update and gives it separate XDG data,
+state, and cache roots. `XDG_CONFIG_HOME` remains unchanged so Protocode and
+official OpenCode share configuration, instructions, skills, providers, and
+themes. Override the defaults with `PROTOCODE_DATA_HOME`,
+`PROTOCODE_STATE_HOME`, and `PROTOCODE_CACHE_HOME`.
+
+To absorb a selected stable release:
+
+```zsh
+git -C "$CODE_WORKSPACE/protocode" fetch upstream --tags
+git -C "$CODE_WORKSPACE/protocode" tag protocode-<old-version>-r<N> stable
+git -C "$CODE_WORKSPACE/protocode" rebase --onto <new-stable-tag> <old-stable-tag> stable
+```
+
+Resolve conflicts deliberately, remove patches already shipped upstream,
+update `PROTOCODE.md`, create the new release tag, and rerun the complete build
+pipeline. Skipping upstream releases is expected.
+
+To exercise or perform rollback, select a retained commit and then restore the
+pinned release after verification:
+
+```zsh
+ln -sfn "builds/<retained-commit>" "$HOME/.local/share/protocode/current"
+protocode --version
+ln -sfn "builds/$(grep '^COMMIT=' protocode.pin | cut -d= -f2)" "$HOME/.local/share/protocode/current"
+```
+
+`doctor` reports a pin mismatch while a previous build is selected, making a
+temporary rollback visible.
 
 ## Friction Log
 
@@ -146,10 +224,12 @@ export PROTOCOL_FRICTION_LOG="$HOME/notes/friction-log.md"
 ## Doctor
 
 `doctor` answers "does this machine match the baseline?" in one run: platform,
-required and optional tools, Neovim version, workspace root, and every
-installed link. It only observes; it never installs or repairs. It exits
-nonzero when anything required is missing, so it also serves as an acceptance
-check after running `install.zsh` on a new machine.
+required and optional tools, Neovim version, workspace root, every installed
+link, and any configured Protocode source, pin, release tag, wrapper, and
+active build. It only observes; it never installs or repairs. Protocode is
+optional when no source or build exists; a partial or inconsistent setup is a
+failure. `doctor` exits nonzero when anything required is missing, so it also
+serves as an acceptance check after installation.
 
 ## Safety Model
 

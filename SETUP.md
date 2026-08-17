@@ -84,7 +84,22 @@ for harnesses that are not installed are harmless and become active if that
 harness is added later. Note the answer so verification in step 8 checks the
 harnesses the user actually runs.
 
-### 6. Global git ignore for agent instruction files
+### 6. Protocode
+
+Ask: "Do you want `oe` to run a verified personal OpenCode distribution while
+keeping official `opencode` available as a fallback?"
+
+If yes, install Bun 1.3 or newer, clone the user's Protocode fork beside this
+repository, configure `anomalyco/opencode` as its `upstream` remote, and check
+out its `stable` branch. Run `install.zsh` to install the static wrapper, then
+follow the build and release-tag procedure in `README.md`. Verify that `oe
+--version` uses the pinned build and `opencode --version` still uses the
+official installation.
+
+If no, the installed wrapper remains dormant and `doctor` reports Protocode as
+an optional unconfigured component.
+
+### 7. Global git ignore for agent instruction files
 
 Explain: the installer adds `AGENTS.md`, `CLAUDE.md`, and `.claude/` to the
 global git ignore, so repository-level agent files stay untracked by default
@@ -97,7 +112,7 @@ If the user declines, remove those lines from the global ignore file after the
 installer runs, and tell the user that `install.zsh --check` and `doctor` will
 report them missing from then on.
 
-### 7. Friction log location
+### 8. Friction log location
 
 Ask: "Where should the friction log live? `ugh <message>` appends timestamped
 annoyances there so improvement work starts from evidence."
@@ -110,7 +125,7 @@ protocol source block:
 export PROTOCOL_FRICTION_LOG="$HOME/notes/friction-log.md"
 ```
 
-### 8. Knowledge vault
+### 9. Knowledge vault
 
 Ask: "Do you want a structured markdown knowledge vault initialized, and if
 so, where?"
@@ -119,7 +134,7 @@ If yes, run `knowledge-vault/init.zsh` against the chosen directory and point
 the user at `knowledge-vault/README.md` for the conventions it sets up. The
 vault's content stays outside this repository permanently.
 
-### 9. Screenshot directory
+### 10. Screenshot directory
 
 Ask: "Where should macOS screenshots be saved? The screenshot skill reads the
 newest capture from this directory so you can show it to an agent without
@@ -133,7 +148,7 @@ defaults write com.apple.screencapture location "$HOME/Documents/Screenshots"
 killall SystemUIServer
 ```
 
-### 10. Dotfile symlink folder
+### 11. Dotfile symlink folder
 
 Ask: "Do you want a `symlinks/` folder in your workspace containing links to
 configuration files that live outside any repository, such as harness settings
@@ -166,6 +181,9 @@ user made.
 - `doctor` exits zero.
 - A new shell shows a colored prompt inside a workspace repository, and `wt`,
   `gs`, `ugh`, `cbfix`, and `theme` are available.
+- If Protocode was adopted: `oe --version` runs the pinned build, `opencode
+  --version` remains available, and `doctor` confirms the source, pin, wrapper,
+  and active build agree.
 - Each harness from question 5 loads the shared instructions and lists the
   shared skills in a fresh session.
 - If Neovim was adopted: `nvim` opens the workspace layout, and `:Rg` finds

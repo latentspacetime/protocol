@@ -1,0 +1,21 @@
+#!/bin/zsh
+# protocol-managed-protocode-wrapper
+
+set -u
+
+install_root="${PROTOCODE_INSTALL_ROOT:-$HOME/.local/share/protocode}"
+executable="$install_root/current/protocode"
+
+if [[ ! -x "$executable" ]]; then
+  toolkit_root="${PROTOCOL_TOOLKIT_ROOT:-${CODE_WORKSPACE:-$HOME/Code}/protocol}"
+  print -u2 -- "protocode build missing: $executable"
+  print -u2 -- "Run: $toolkit_root/scripts/protocode-build.zsh"
+  exit 1
+fi
+
+export OPENCODE_DISABLE_AUTOUPDATE=1
+export XDG_DATA_HOME="${PROTOCODE_DATA_HOME:-$install_root/xdg-data}"
+export XDG_STATE_HOME="${PROTOCODE_STATE_HOME:-$install_root/xdg-state}"
+export XDG_CACHE_HOME="${PROTOCODE_CACHE_HOME:-$install_root/xdg-cache}"
+
+exec "$executable" "$@"
