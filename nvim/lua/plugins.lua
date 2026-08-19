@@ -8,4 +8,10 @@ require("lazy").setup({
     "nvim-tree/nvim-tree.lua",
     { "junegunn/fzf", build = "./install --all" },
     "junegunn/fzf.vim",
+    {
+        "latentspacetime/warp.nvim",
+        config = function()
+            require("warp").setup()
+        end,
+    },
 })
