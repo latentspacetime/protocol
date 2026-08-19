@@ -112,14 +112,10 @@ the shell prompt. Explicit assignments live in `shell/repo-colors.conf`; the
 prompt and picker both call `protocol_repo_color`, so the palette, hash, and
 overrides have one owner.
 
-## Warp LLM Popup
+## Warp
 
-Inside Neovim, `<Leader>k` opens a small floating window for a quick LLM
-query. Type a question and press Enter; the response streams in below a
-divider with markdown rendering. Press `s` to cycle models, `m` for the menu,
-and `b` to copy a code block from the response. Requests go to OpenRouter and
-authenticate with the `OPENROUTER_API_KEY` environment variable; without the
-key the popup reports that and sends nothing.
+Neovim can load [warp.nvim](https://github.com/latentspacetime/warp.nvim) as
+an optional plugin. The lazy.nvim spec calls `require("warp").setup()`.
 
 ## Agent-Guided Setup
 
