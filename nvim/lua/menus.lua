@@ -72,7 +72,7 @@ local function unwrap_clipboard()
         flash("Clipboard is empty.", 1500)
         return
     end
-    local cleaned = text:gsub('(%S) *\n  +', '%1 ')
+    local cleaned = text:gsub('(%S) *\n\n?  +', '%1 ')
     if cleaned == text then
         flash("No wrap artifacts found.", 1500)
         return

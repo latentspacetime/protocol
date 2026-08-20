@@ -21,6 +21,23 @@ local scratch_buf = nil  -- session-lifetime scratch buffer, created lazily
 local float_win = nil    -- current float window, nil while hidden
 local saved_cursor = nil -- cursor position carried across hide/show
 
+local function unwrap_text(text)
+    return text:gsub('(%S) *\n\n?  +', '%1 ')
+end
+
+local orig_paste = vim.paste
+vim.paste = function(lines, phase)
+    if scratch_buf and vim.api.nvim_buf_is_valid(scratch_buf)
+        and vim.api.nvim_get_current_buf() == scratch_buf then
+        local text = table.concat(lines, '\n')
+        local cleaned = unwrap_text(text)
+        if cleaned ~= text then
+            lines = vim.split(cleaned, '\n', { plain = true })
+        end
+    end
+    return orig_paste(lines, phase)
+end
+
 local function scratch_is_empty()
     if not (scratch_buf and vim.api.nvim_buf_is_valid(scratch_buf)) then
         return true
@@ -121,6 +138,17 @@ local function ensure_scratch_buf()
     local opts = { buffer = scratch_buf, silent = true, nowait = true }
     vim.keymap.set("n", "m", otemp_menu, opts)
     vim.keymap.set("n", "<Esc>", M.close, opts)
+    for _, key in ipairs({ "p", "P" }) do
+        vim.keymap.set("n", key, function()
+            local reg = vim.v.register
+            local content = vim.fn.getreg(reg)
+            local cleaned = unwrap_text(content)
+            if cleaned ~= content then
+                vim.fn.setreg(reg, cleaned, vim.fn.getregtype(reg))
+            end
+            return '"' .. reg .. key
+        end, { buffer = scratch_buf, expr = true, silent = true, nowait = true })
+    end
     return scratch_buf
 end
 
