@@ -129,5 +129,23 @@ step5 = function()
     check("title flips to normal hints on mode change",
         float_title_text():find("NORMAL", 1, true) ~= nil
         and not float_title_text():find("INSERT", 1, true))
+
+    -- Auto-unwrap: normal-mode p cleans wrap artifacts before pasting.
+    otemp.close()
+    otemp.toggle()
+    vim.cmd("stopinsert")
+    vim.fn.setreg('+', "hello\n    world", 'c')
+    vim.cmd('normal "+p')
+    local pasted = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
+    check("p unwraps single-newline wrap artifacts", pasted:find("hello world", 1, true) ~= nil)
+
+    vim.api.nvim_feedkeys("y", "t", false)
+    otemp.clear()
+    vim.cmd("stopinsert")
+    vim.fn.setreg('+', "think very\n\n    carefully about", 'c')
+    vim.cmd('normal "+p')
+    local pasted2 = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
+    check("p unwraps double-newline wrap artifacts", pasted2:find("think very carefully about", 1, true) ~= nil)
+
     finish()
 end

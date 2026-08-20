@@ -246,8 +246,8 @@ gs() {
   fi
 }
 
-cbfix() {
-  pbpaste | perl -0777 -pe 's/(\S) *\n {2,}/$1 /g' | pbcopy
+ff() {
+  pbpaste | perl -0777 -pe 's/(\S) *\n{1,2} {2,}/$1 /g' | pbcopy
   print "Clipboard unwrapped."
 }
 
